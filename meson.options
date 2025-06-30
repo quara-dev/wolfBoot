@@ -1,0 +1,207 @@
+# WolfBoot Meson Build Options
+
+# Architecture and Target Configuration
+option('arch', type: 'combo', value: 'ARM', 
+       choices: ['ARM', 'AARCH64', 'x86_64', 'PPC', 'RISCV'], 
+       description: 'Target architecture')
+
+option('target', type: 'string', value: 'stm32h7', 
+       description: 'Target platform (e.g., stm32f4, nrf52, sama5d3, etc.)')
+
+# Cryptographic Configuration
+option('sign', type: 'combo', value: 'ECC256', 
+       choices: ['NONE', 'ED25519', 'ECC256', 'ECC384', 'ECC521', 'RSA2048', 'RSA4096', 'LMS', 'XMSS', 'ML_DSA'], 
+       description: 'Signature algorithm')
+
+option('hash', type: 'combo', value: 'SHA256', 
+       choices: ['SHA256', 'SHA3', 'BLAKE2B'], 
+       description: 'Hash algorithm')
+
+option('encrypt', type: 'boolean', value: false, 
+       description: 'Enable encryption support')
+
+option('encrypt_with_chacha', type: 'boolean', value: false, 
+       description: 'Enable ChaCha20 encryption')
+
+option('encrypt_with_aes128', type: 'boolean', value: false, 
+       description: 'Enable AES128 encryption')
+
+option('encrypt_with_aes256', type: 'boolean', value: false, 
+       description: 'Enable AES256 encryption')
+
+# General Configuration
+option('wolfboot_debug', type: 'boolean', value: false, 
+       description: 'Enable debug build')
+
+option('debug_uart', type: 'boolean', value: false, 
+       description: 'Enable UART debug output')
+
+option('big_endian', type: 'boolean', value: false, 
+       description: 'Target is big endian')
+
+option('use_gcc_headless', type: 'boolean', value: true, 
+       description: 'Use GCC headless compilation flags')
+
+option('wolfboot_version', type: 'integer', value: 0, 
+       description: 'WolfBoot version number')
+
+# Flash and Storage Configuration
+option('flash_otp_keystore', type: 'boolean', value: false, 
+       description: 'Use OTP flash for keystore')
+
+option('ext_flash', type: 'boolean', value: false, 
+       description: 'Enable external flash support')
+
+option('spi_flash', type: 'boolean', value: false, 
+       description: 'Enable SPI flash support')
+
+option('qspi_flash', type: 'boolean', value: false, 
+       description: 'Enable QSPI flash support')
+
+option('octospi_flash', type: 'boolean', value: false, 
+       description: 'Enable OCTOSPI flash support')
+
+option('uart_flash', type: 'boolean', value: false, 
+       description: 'Enable UART flash support')
+
+# TPM Configuration
+option('wolfboot_tpm_verify', type: 'boolean', value: false, 
+       description: 'Enable TPM signature verification')
+
+option('measured_boot', type: 'boolean', value: false, 
+       description: 'Enable measured boot with TPM')
+
+option('wolfboot_tpm_keystore', type: 'boolean', value: false, 
+       description: 'Enable TPM keystore')
+
+option('wolfboot_tpm_seal', type: 'boolean', value: false, 
+       description: 'Enable TPM sealing')
+
+option('wolfboot_tmp_keystore', type: 'boolean', value: false, 
+       description: 'Enable TPM temporary keystore')
+
+option('measured_pcr_a', type: 'integer', value: 16, 
+       description: 'PCR for measured boot')
+
+# Update and Backup Configuration
+option('allow_downgrade', type: 'boolean', value: false, 
+       description: 'Allow firmware downgrade')
+
+option('nvm_flash_writeonce', type: 'boolean', value: false, 
+       description: 'NVM flash write once')
+
+option('disable_backup', type: 'boolean', value: false, 
+       description: 'Disable backup partition')
+
+option('dualbank_swap', type: 'boolean', value: false, 
+       description: 'Enable dual bank swap')
+
+# Math Library Configuration
+option('spmath', type: 'boolean', value: true, 
+       description: 'Use SP Math library')
+
+option('spmathall', type: 'boolean', value: false, 
+       description: 'Use SP Math All library')
+
+# Memory Configuration
+option('ram_code', type: 'boolean', value: false, 
+       description: 'Execute code from RAM')
+
+option('no_xip', type: 'boolean', value: false, 
+       description: 'Disable execute in place')
+
+# Loader Configuration
+option('no_loader', type: 'boolean', value: false, 
+       description: 'Disable loader functionality')
+
+# Cortex-M Specific Options
+option('cortex_m0', type: 'boolean', value: false, 
+       description: 'Target is Cortex-M0')
+
+option('cortex_m3', type: 'boolean', value: false, 
+       description: 'Target is Cortex-M3')
+
+option('cortex_m33', type: 'boolean', value: false, 
+       description: 'Target is Cortex-M33')
+
+option('cortex_m7', type: 'boolean', value: false, 
+       description: 'Target is Cortex-M7')
+
+# Assembly Configuration
+option('no_asm', type: 'boolean', value: false, 
+       description: 'Disable assembly optimizations')
+
+option('no_arm_asm', type: 'boolean', value: false, 
+       description: 'Disable ARM assembly optimizations')
+
+# Vector Table Configuration
+option('vtor', type: 'boolean', value: true, 
+       description: 'Enable vector table relocation')
+
+# Memory Protection
+option('no_mpu', type: 'boolean', value: false, 
+       description: 'Disable MPU support')
+
+# TrustZone Configuration
+option('tzen', type: 'boolean', value: false, 
+       description: 'Enable TrustZone support')
+
+# FSP Configuration
+option('fsp', type: 'boolean', value: false, 
+       description: 'Enable FSP support')
+
+# Delta Updates
+option('delta_updates', type: 'boolean', value: false, 
+       description: 'Enable delta updates')
+
+# Build Verbosity
+option('verbose', type: 'boolean', value: false, 
+       description: 'Enable verbose build output')
+
+# Partition Addresses (as strings to handle hex values)
+option('wolfboot_partition_size', type: 'string', value: '0x20000', 
+       description: 'Partition size')
+
+option('wolfboot_sector_size', type: 'string', value: '0x1000', 
+       description: 'Sector size')
+
+option('wolfboot_partition_boot_address', type: 'string', value: '0x20000', 
+       description: 'Boot partition address')
+
+option('wolfboot_partition_update_address', type: 'string', value: '0x40000', 
+       description: 'Update partition address')
+
+option('wolfboot_partition_swap_address', type: 'string', value: '0x60000', 
+       description: 'Swap partition address')
+
+option('wolfboot_load_address', type: 'string', value: '0x20000', 
+       description: 'Load address')
+
+option('wolfboot_origin', type: 'string', value: '0x08000000', 
+       description: 'Flash origin address')
+
+option('arch_flash_offset', type: 'string', value: '0x0', 
+       description: 'Architecture flash offset')
+
+# Image Configuration
+option('image_header_size', type: 'string', value: '0x100', 
+       description: 'Image header size')
+
+option('image_signature_size', type: 'string', value: '0x40', 
+       description: 'Image signature size')
+
+# Post-quantum cryptography
+option('ml_dsa_level', type: 'integer', value: 2, 
+       description: 'ML-DSA security level')
+
+option('lms_levels', type: 'integer', value: 2, 
+       description: 'LMS levels')
+
+option('lms_height', type: 'integer', value: 5, 
+       description: 'LMS height')
+
+option('lms_winternitz', type: 'integer', value: 8, 
+       description: 'LMS Winternitz parameter')
+
+option('xmss_params', type: 'string', value: 'XMSS-SHA2_10_256', 
+       description: 'XMSS parameters')
