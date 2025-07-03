@@ -414,7 +414,7 @@ if target != 'library'
   endif
 
   if get_option('use_gcc_headless')
-    link_args += ['-Wl,--gc-sections', '-ffreestanding', '-nostartfiles']
+    link_args += ['-Wl,--gc-sections', '-Map=wolfboot.map', '-ffreestanding', '-nostartfiles']
   endif
 
   wolfboot_exe = executable('wolfboot',
