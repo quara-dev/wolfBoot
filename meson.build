@@ -388,7 +388,7 @@ libwolfboot = static_library('wolfboot',
 
 # Subprojects
 subdir('tools/keytools')
-# subdir('tools/bin-assemble')  # Comment out for now
+subdir('tools/bin-assemble') 
 
 # Main executable (if not library target)
 if target != 'library'
