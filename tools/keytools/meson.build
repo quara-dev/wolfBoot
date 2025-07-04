@@ -1,16 +1,7 @@
 # WolfBoot Key Tools Build - Full Makefile Implementation
 
-# Configuration from options
-wolfbootdir = meson.project_source_root()
-wolfdir = wolfbootdir / 'lib' / 'wolfssl'
-
 # Include directories
-keytools_inc = include_directories(
-  '.',
-  '../../include',
-  '../../lib/wolfssl',
-  '../..'
-)
+keytools_inc = inc_dirs
 
 # Base compiler flags matching Makefile
 keytools_cflags = [
@@ -79,50 +70,10 @@ if renesas_key_env != ''
   endif
 endif
 
-# WolfSSL cryptographic source files (matching Makefile OBJS_REAL)
-wolfssl_sources = files(
-  '../../lib/wolfssl/wolfcrypt/src/asn.c',
-  '../../lib/wolfssl/wolfcrypt/src/aes.c',
-  '../../lib/wolfssl/wolfcrypt/src/ecc.c',
-  '../../lib/wolfssl/wolfcrypt/src/coding.c',
-  '../../lib/wolfssl/wolfcrypt/src/chacha.c',
-  '../../lib/wolfssl/wolfcrypt/src/ed25519.c',
-  '../../lib/wolfssl/wolfcrypt/src/ed448.c',
-  '../../lib/wolfssl/wolfcrypt/src/fe_operations.c',
-  '../../lib/wolfssl/wolfcrypt/src/ge_operations.c',
-  '../../lib/wolfssl/wolfcrypt/src/fe_448.c',
-  '../../lib/wolfssl/wolfcrypt/src/ge_448.c',
-  '../../lib/wolfssl/wolfcrypt/src/hash.c',
-  '../../lib/wolfssl/wolfcrypt/src/logging.c',
-  '../../lib/wolfssl/wolfcrypt/src/memory.c',
-  '../../lib/wolfssl/wolfcrypt/src/random.c',
-  '../../lib/wolfssl/wolfcrypt/src/rsa.c',
-  '../../lib/wolfssl/wolfcrypt/src/sp_int.c',
-  '../../lib/wolfssl/wolfcrypt/src/sp_c32.c',
-  '../../lib/wolfssl/wolfcrypt/src/sp_c64.c',
-  '../../lib/wolfssl/wolfcrypt/src/sha3.c',
-  '../../lib/wolfssl/wolfcrypt/src/sha256.c',
-  '../../lib/wolfssl/wolfcrypt/src/sha512.c',
-  '../../lib/wolfssl/wolfcrypt/src/tfm.c',
-  '../../lib/wolfssl/wolfcrypt/src/wc_port.c',
-  '../../lib/wolfssl/wolfcrypt/src/wolfmath.c',
-  # LMS support
-  '../../lib/wolfssl/wolfcrypt/src/wc_lms.c',
-  '../../lib/wolfssl/wolfcrypt/src/wc_lms_impl.c',
-  # XMSS support
-  '../../lib/wolfssl/wolfcrypt/src/wc_xmss.c',
-  '../../lib/wolfssl/wolfcrypt/src/wc_xmss_impl.c',
-  # ML-DSA (Dilithium) support
-  '../../lib/wolfssl/wolfcrypt/src/dilithium.c',
-)
 
-# WolfBoot delta update support
-wolfboot_sources = files(
-  '../../src/delta.c'
-)
 
 # Combine all sources
-all_sources = wolfssl_sources + wolfboot_sources
+all_sources = wolfssl_sources + wolfboot_delta_sources
 
 # Key generation tool
 keygen = executable('keygen',

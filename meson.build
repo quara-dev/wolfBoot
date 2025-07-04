@@ -52,6 +52,8 @@ endforeach
 if get_option('use_gcc_headless')
   embedded_flags = [
     '-ffreestanding',
+    '-Wno-main',
+    '-Wno-used',
     '-nostartfiles',
     '-ffunction-sections',
     '-fdata-sections',
@@ -201,6 +203,7 @@ target_h = configure_file(
   configuration : conf_data,
 )
 
+
 # Math library selection
 if get_option('spmath')
   c_args += ['-DWOLFSSL_SP_MATH']
@@ -211,12 +214,62 @@ else
   c_args += ['-DUSE_FAST_MATH']
 endif
 
+# WolfSSL directory
+WolfSSL_inc = include_directories('lib/wolfssl')
+
+
 # Include directories
-inc_dirs = include_directories([
-  '.',
-  'include',
-  'lib/wolfssl',
-])
+local_inc_dirs = include_directories(
+  '.', 
+  'include'
+)
+
+inc_dirs = [local_inc_dirs,
+  WolfSSL_inc,
+  ]
+
+# WolfSSL cryptographic source files (matching Makefile OBJS_REAL)
+wolfssl_sources = files(
+  'lib/wolfssl/wolfcrypt/src/asn.c',
+  'lib/wolfssl/wolfcrypt/src/aes.c',
+  'lib/wolfssl/wolfcrypt/src/ecc.c',
+  'lib/wolfssl/wolfcrypt/src/coding.c',
+  'lib/wolfssl/wolfcrypt/src/chacha.c',
+  'lib/wolfssl/wolfcrypt/src/ed25519.c',
+  'lib/wolfssl/wolfcrypt/src/ed448.c',
+  'lib/wolfssl/wolfcrypt/src/fe_operations.c',
+  'lib/wolfssl/wolfcrypt/src/ge_operations.c',
+  'lib/wolfssl/wolfcrypt/src/fe_448.c',
+  'lib/wolfssl/wolfcrypt/src/ge_448.c',
+  'lib/wolfssl/wolfcrypt/src/hash.c',
+  'lib/wolfssl/wolfcrypt/src/logging.c',
+  'lib/wolfssl/wolfcrypt/src/memory.c',
+  'lib/wolfssl/wolfcrypt/src/random.c',
+  'lib/wolfssl/wolfcrypt/src/rsa.c',
+  'lib/wolfssl/wolfcrypt/src/sp_int.c',
+  'lib/wolfssl/wolfcrypt/src/sp_c32.c',
+  'lib/wolfssl/wolfcrypt/src/sp_c64.c',
+  'lib/wolfssl/wolfcrypt/src/sha3.c',
+  'lib/wolfssl/wolfcrypt/src/sha256.c',
+  'lib/wolfssl/wolfcrypt/src/sha512.c',
+  'lib/wolfssl/wolfcrypt/src/tfm.c',
+  'lib/wolfssl/wolfcrypt/src/wc_port.c',
+  'lib/wolfssl/wolfcrypt/src/wolfmath.c',
+  # LMS support
+  'lib/wolfssl/wolfcrypt/src/wc_lms.c',
+  'lib/wolfssl/wolfcrypt/src/wc_lms_impl.c',
+  # XMSS support
+  'lib/wolfssl/wolfcrypt/src/wc_xmss.c',
+  'lib/wolfssl/wolfcrypt/src/wc_xmss_impl.c',
+  # ML-DSA (Dilithium) support
+  'lib/wolfssl/wolfcrypt/src/dilithium.c',
+)
+
+# WolfBoot delta update support
+wolfboot_delta_sources = files(
+  'src/delta.c'
+)
+
 
 # Additional build directory for generated files
 build_inc_dirs = include_directories(['.'], is_system: false)
@@ -393,28 +446,43 @@ subdir('tools/bin-assemble')
 # Main executable (if not library target)
 if target != 'library'
   # Try to find a linker script
-  linker_script = ''
+  
+  linker_file = '@0@.ld'.format(target)
   link_args = []
-  
-  possible_scripts = [
-    'hal/@0@.ld'.format(target),
-    'hal/@0@.ld'.format(arch),
-    'config/target.ld',
-  ]
-  
-  foreach script : possible_scripts
-    if fs.exists(script)
-      linker_script = script
-      break
-    endif
-  endforeach
-  
-  if linker_script != ''
-    link_args = ['-T', meson.current_source_dir() / linker_script]
+  if (fs.exists('hal/' + linker_file))
+    configure_file(
+        copy: true,
+        input: 'hal/' + linker_file,
+        output: linker_file,
+    )
   endif
 
+  # Configuration data for target.h
+  linker_conf_data = configuration_data()
+  linker_conf_data.set('WOLFBOOT_PARTITION_SIZE', get_option('wolfboot_sector_size'))
+  linker_conf_data.set('WOLFBOOT_PARTITION_BOOT_ADDRESS', get_option('wolfboot_partition_boot_address'))
+  linker_conf_data.set('WOLFBOOT_PARTITION_UPDATE_ADDRESS', get_option('wolfboot_partition_update_address'))
+  linker_conf_data.set('WOLFBOOT_PARTITION_SWAP_ADDRESS', get_option('wolfboot_partition_swap_address'))
+  linker_conf_data.set('BOOTLOADER_PARTITION_SIZE', get_option('wolfboot_partition_size'))
+  linker_conf_data.set('WOLFBOOT_DTS_BOOT_ADDRESS', get_option('wolfboot_partition_boot_address'))
+  linker_conf_data.set('WOLFBOOT_DTS_UPDATE_ADDRESS', get_option('wolfboot_partition_update_address'))
+  linker_conf_data.set('WOLFBOOT_LOAD_ADDRESS', get_option('wolfboot_load_address'))
+  linker_conf_data.set('WOLFBOOT_LOAD_DTS_ADDRESS', get_option('wolfboot_load_address'))
+
+  
+
+  linker_script = configure_file(
+  input : 'hal/@0@.ld'.format(target),
+  output : '@0@.ld'.format(target),
+  configuration : linker_conf_data,
+)
+  
+  link_args = ['-L' + meson.current_build_dir(),
+    '-T' + linker_file,]
+  
+
   if get_option('use_gcc_headless')
-    link_args += ['-Wl,--gc-sections', '-Map=wolfboot.map', '-ffreestanding', '-nostartfiles']
+    link_args += ['-Wl,--gc-sections', '-Wl,-Map=wolfboot.map', '-ffreestanding', '-nostartfiles']
   endif
 
   wolfboot_exe = executable('wolfboot',
@@ -427,23 +495,23 @@ if target != 'library'
   )
 
   # Binary generation
-  objcopy = find_program('objcopy', required: false)
-  if objcopy.found()
-    wolfboot_bin = custom_target('wolfboot.bin',
-      input : wolfboot_exe,
-      output : 'wolfboot.bin',
-      command : [objcopy, '-O', 'binary', '@INPUT@', '@OUTPUT@'],
-      install : false,
-      build_by_default : true,
-    )
+  # objcopy = find_program('objcopy', required: false)
+  # if objcopy.found()
+  #   wolfboot_bin = custom_target('wolfboot.bin',
+  #     input : wolfboot_exe,
+  #     output : 'wolfboot.bin',
+  #     command : [objcopy, '-O', 'binary', '@INPUT@', '@OUTPUT@'],
+  #     install : false,
+  #     build_by_default : true,
+  #   )
 
-    wolfboot_hex = custom_target('wolfboot.hex',
-      input : wolfboot_exe,
-      output : 'wolfboot.hex',
-      command : [objcopy, '-O', 'ihex', '@INPUT@', '@OUTPUT@'],
-      install : false,
-    )
-  endif
+  #   wolfboot_hex = custom_target('wolfboot.hex',
+  #     input : wolfboot_exe,
+  #     output : 'wolfboot.hex',
+  #     command : [objcopy, '-O', 'ihex', '@INPUT@', '@OUTPUT@'],
+  #     install : false,
+  #   )
+  # endif
 endif
 
 # Create dependency for other projects
