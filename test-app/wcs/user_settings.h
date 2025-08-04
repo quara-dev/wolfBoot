@@ -26,6 +26,8 @@
 #define H_USER_SETTINGS_
 
 #include <target.h>
+#include <time.h>
+int clock_gettime (clockid_t clock_id, struct timespec *tp);
 #include "wolfboot/wc_secure.h"
 
 #define WOLFCRYPT_ONLY
@@ -141,5 +143,7 @@ extern int tolower(int c);
 #define WOLFSSL_SP_NO_DYN_STACK
 
 
+struct timespec;
+int clock_gettime (unsigned long clock_id, struct timespec *tp);
 
 #endif /* !H_USER_SETTINGS_ */

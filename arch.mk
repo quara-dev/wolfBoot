@@ -243,6 +243,10 @@ ifeq ($(ARCH),ARM)
       LSCRIPT_IN=hal/$(TARGET)-ns.ld
     endif
     SPI_TARGET=stm32
+    ifneq ($(DEBUG),0)
+        CFLAGS+=-DPKCS11_SMALL
+    endif
+
   endif
 
   ifeq ($(TARGET),rp2350)
@@ -272,7 +276,8 @@ ifeq ($(ARCH),ARM)
 
 ifeq ($(CORTEX_A5),1)
   FPU=-mfpu=vfp4-d16
-  CFLAGS+=-mcpu=cortex-a5  -mtune=cortex-a5 -static -z noexecstack
+  CFLAGS+=-mcpu=cortex-a5  -mtune=cortex-a5 -static -z noexecstack \
+		  -mno-unaligned-access
   LDLAGS+=-mcpu=cortex-a5 -mtune=cortex-a5  -mtune=cortex-a5 -static \
           -z noexecstack  -Ttext 0x300000
   # Cortex-A uses boot_arm32.o
