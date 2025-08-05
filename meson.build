@@ -1,8 +1,10 @@
-project('wolfboot', 'c',
-  version : '2.5.0',
-  license : 'GPL-2.0+',
-  meson_version : '>=0.61.0',
-  default_options : {
+project(
+  'wolfboot',
+  'c',
+  version: '2.5.0',
+  license: 'GPL-2.0+',
+  meson_version: '>=0.61.0',
+  default_options: {
     'c_std': 'gnu11',
     'warning_level': '2',
     'buildtype': 'release',
@@ -11,7 +13,7 @@ project('wolfboot', 'c',
     'b_staticpic': false,
     'b_pie': false,
     'b_lto': false,
-  }
+  },
 )
 
 # Initialize global variables and modules
@@ -59,7 +61,7 @@ if get_option('use_gcc_headless')
     '-fdata-sections',
     '-fomit-frame-pointer',
   ]
-  
+
   foreach flag : embedded_flags
     if cc.has_argument(flag)
       c_args += flag
@@ -187,22 +189,33 @@ c_args += ['-DSTM32_PLLQ=@0@'.format(get_option('stm32_pllq'))]
 # Configuration data for target.h
 conf_data = configuration_data()
 conf_data.set('WOLFBOOT_SECTOR_SIZE', get_option('wolfboot_sector_size'))
-conf_data.set('WOLFBOOT_PARTITION_BOOT_ADDRESS', get_option('wolfboot_partition_boot_address'))
-conf_data.set('WOLFBOOT_PARTITION_UPDATE_ADDRESS', get_option('wolfboot_partition_update_address'))
-conf_data.set('WOLFBOOT_PARTITION_SWAP_ADDRESS', get_option('wolfboot_partition_swap_address'))
+conf_data.set(
+  'WOLFBOOT_PARTITION_BOOT_ADDRESS',
+  get_option('wolfboot_partition_boot_address'),
+)
+conf_data.set(
+  'WOLFBOOT_PARTITION_UPDATE_ADDRESS',
+  get_option('wolfboot_partition_update_address'),
+)
+conf_data.set(
+  'WOLFBOOT_PARTITION_SWAP_ADDRESS',
+  get_option('wolfboot_partition_swap_address'),
+)
 conf_data.set('WOLFBOOT_PARTITION_SIZE', get_option('wolfboot_partition_size'))
 conf_data.set('WOLFBOOT_DTS_BOOT_ADDRESS', get_option('wolfboot_partition_boot_address'))
-conf_data.set('WOLFBOOT_DTS_UPDATE_ADDRESS', get_option('wolfboot_partition_update_address'))
+conf_data.set(
+  'WOLFBOOT_DTS_UPDATE_ADDRESS',
+  get_option('wolfboot_partition_update_address'),
+)
 conf_data.set('WOLFBOOT_LOAD_ADDRESS', get_option('wolfboot_load_address'))
 conf_data.set('WOLFBOOT_LOAD_DTS_ADDRESS', get_option('wolfboot_load_address'))
 
 # Generate target.h from template
 target_h = configure_file(
-  input : 'include/target.h.in',
-  output : 'target.h',
-  configuration : conf_data,
+  input: 'include/target.h.in',
+  output: 'target.h',
+  configuration: conf_data,
 )
-
 
 # Math library selection
 if get_option('spmath')
@@ -217,59 +230,53 @@ endif
 # WolfSSL directory
 WolfSSL_inc = include_directories('lib/wolfssl')
 
-
 # Include directories
-local_inc_dirs = include_directories(
-  '.', 
-  'include'
-)
+local_inc_dirs = include_directories('.', 'include')
 
-inc_dirs = [local_inc_dirs,
+inc_dirs = [
+  local_inc_dirs,
   WolfSSL_inc,
-  ]
+]
 
 # WolfSSL cryptographic source files (matching Makefile OBJS_REAL)
 wolfssl_sources = files(
-  'lib/wolfssl/wolfcrypt/src/asn.c',
   'lib/wolfssl/wolfcrypt/src/aes.c',
-  'lib/wolfssl/wolfcrypt/src/ecc.c',
-  'lib/wolfssl/wolfcrypt/src/coding.c',
+  'lib/wolfssl/wolfcrypt/src/asn.c',
   'lib/wolfssl/wolfcrypt/src/chacha.c',
+  'lib/wolfssl/wolfcrypt/src/coding.c',
+  # ML-DSA (Dilithium) support
+  'lib/wolfssl/wolfcrypt/src/dilithium.c',
+  'lib/wolfssl/wolfcrypt/src/ecc.c',
   'lib/wolfssl/wolfcrypt/src/ed25519.c',
   'lib/wolfssl/wolfcrypt/src/ed448.c',
-  'lib/wolfssl/wolfcrypt/src/fe_operations.c',
-  'lib/wolfssl/wolfcrypt/src/ge_operations.c',
   'lib/wolfssl/wolfcrypt/src/fe_448.c',
+  'lib/wolfssl/wolfcrypt/src/fe_operations.c',
   'lib/wolfssl/wolfcrypt/src/ge_448.c',
+  'lib/wolfssl/wolfcrypt/src/ge_operations.c',
   'lib/wolfssl/wolfcrypt/src/hash.c',
   'lib/wolfssl/wolfcrypt/src/logging.c',
   'lib/wolfssl/wolfcrypt/src/memory.c',
   'lib/wolfssl/wolfcrypt/src/random.c',
   'lib/wolfssl/wolfcrypt/src/rsa.c',
-  'lib/wolfssl/wolfcrypt/src/sp_int.c',
+  'lib/wolfssl/wolfcrypt/src/sha256.c',
+  'lib/wolfssl/wolfcrypt/src/sha3.c',
+  'lib/wolfssl/wolfcrypt/src/sha512.c',
   'lib/wolfssl/wolfcrypt/src/sp_c32.c',
   'lib/wolfssl/wolfcrypt/src/sp_c64.c',
-  'lib/wolfssl/wolfcrypt/src/sha3.c',
-  'lib/wolfssl/wolfcrypt/src/sha256.c',
-  'lib/wolfssl/wolfcrypt/src/sha512.c',
+  'lib/wolfssl/wolfcrypt/src/sp_int.c',
   'lib/wolfssl/wolfcrypt/src/tfm.c',
-  'lib/wolfssl/wolfcrypt/src/wc_port.c',
-  'lib/wolfssl/wolfcrypt/src/wolfmath.c',
   # LMS support
   'lib/wolfssl/wolfcrypt/src/wc_lms.c',
   'lib/wolfssl/wolfcrypt/src/wc_lms_impl.c',
+  'lib/wolfssl/wolfcrypt/src/wc_port.c',
   # XMSS support
   'lib/wolfssl/wolfcrypt/src/wc_xmss.c',
   'lib/wolfssl/wolfcrypt/src/wc_xmss_impl.c',
-  # ML-DSA (Dilithium) support
-  'lib/wolfssl/wolfcrypt/src/dilithium.c',
+  'lib/wolfssl/wolfcrypt/src/wolfmath.c',
 )
 
 # WolfBoot delta update support
-wolfboot_delta_sources = files(
-  'src/delta.c'
-)
-
+wolfboot_delta_sources = files('src/delta.c')
 
 # Additional build directory for generated files
 build_inc_dirs = include_directories(['.'], is_system: false)
@@ -295,15 +302,6 @@ if target != 'library'
   else
     warning('HAL file @0@ not found, using skeleton HAL'.format(hal_file))
     wolfboot_sources += ['hal/skeleton.c']
-  endif
-endif
-
-# Add keystore sources based on signing configuration
-if sign != 'NONE'
-  if get_option('flash_otp_keystore')
-    wolfboot_sources += ['src/flash_otp_keystore.c']
-  else
-    wolfboot_sources += ['src/keystore.c']
   endif
 endif
 
@@ -395,15 +393,17 @@ if get_option('uart_flash')
 endif
 
 # TPM sources
-tpm_enabled = (get_option('wolfboot_tpm_verify') or 
-               get_option('measured_boot') or 
-               get_option('wolfboot_tpm_keystore') or 
-               get_option('wolfboot_tpm_seal'))
+tpm_enabled = (
+  get_option('wolfboot_tpm_verify')
+  or get_option('measured_boot')
+  or get_option('wolfboot_tpm_keystore')
+  or get_option('wolfboot_tpm_seal')
+)
 
 if tpm_enabled
   wolfboot_sources += ['src/tpm.c']
   c_args += ['-DWOLFBOOT_TPM', '-DWOLFTPM_SMALL_STACK', '-DWOLFTPM_AUTODETECT']
-  
+
   # Add wolfTPM sources if available
   if fs.exists('lib/wolfTPM')
     inc_dirs = include_directories(inc_dirs, 'lib/wolfTPM')
@@ -428,24 +428,6 @@ if get_option('delta_updates')
   c_args += ['-DDELTA_UPDATES']
 endif
 
-# All sources combined
-all_sources = wolfboot_sources + wolfcrypt_sources
-
-# Main wolfboot library
-libwolfboot = static_library('wolfboot',
-  all_sources,
-  include_directories : [inc_dirs, build_inc_dirs],
-  c_args : c_args,
-  install : false,
-)
-
-# Create dependency for other projects (needed by subprojects)
-wolfboot_dep = declare_dependency(
-  include_directories : inc_dirs,
-  link_with : libwolfboot,
-  compile_args : c_args,
-)
-
 # Subprojects - Build tools separately like Makefile
 # Only build keytools and bin-assemble when explicitly requested
 build_keytools = get_option('build_keytools')
@@ -460,7 +442,7 @@ if build_keytools
   subdir('tools/keytools')
   # Get the keytools from the subdirectory
   keytools_target = get_variable('keytools_executables', [])
-  
+
   # Add OTP tools if flash_otp_keystore is enabled (matching Makefile logic)
   if get_option('flash_otp_keystore')
     subdir('tools/keytools/otp')
@@ -468,82 +450,131 @@ if build_keytools
   endif
 endif
 
-if build_bin_assemble  
+if build_bin_assemble
   subdir('tools/bin-assemble')
-  # Get the bin-assemble tool from the subdirectory  
+  # Get the bin-assemble tool from the subdirectory
   bin_assemble_target = get_variable('bin_assemble_executable', [])
 endif
 
 # Add a custom target for keytools that matches Makefile behavior
 all_tools = keytools_target + otp_target
-keytools_custom = custom_target('keytools',
-  output : 'keytools.stamp',
-  command : [find_program('touch'), '@OUTPUT@'],
-  depends : all_tools,
-  build_by_default : false,
-  console : true,
+
+keytools_custom = custom_target(
+  'keytools',
+  output: 'keytools.stamp',
+  command: [find_program('touch'), '@OUTPUT@'],
+  depends: all_tools,
+  build_by_default: false,
+  console: true,
 )
 
 # Add custom target for OTP tools specifically (matching Makefile otp target)
 if get_option('flash_otp_keystore') and build_keytools
-  otp_custom = custom_target('otp',
-    output : 'otp.stamp', 
-    command : [find_program('touch'), '@OUTPUT@'],
-    depends : otp_target,
-    build_by_default : false,
-    console : true,
+  otp_custom = custom_target(
+    'otp',
+    output: 'otp.stamp',
+    command: [find_program('touch'), '@OUTPUT@'],
+    depends: otp_target,
+    build_by_default: false,
+    console: true,
   )
-endif 
+endif
+
+keystore_source = []
+# Add keystore sources based on signing configuration
+if sign != 'NONE'
+  if get_option('flash_otp_keystore')
+    keystore_source += ['src/flash_otp_keystore.c']
+  else
+    keystore_source += ['src/keystore.c']
+  endif
+endif
+
+# All sources combined
+all_sources = wolfboot_sources + wolfcrypt_sources
+
+# Main wolfboot library
+libwolfboot = static_library(
+  'wolfboot',
+  all_sources,
+  include_directories: [inc_dirs, build_inc_dirs],
+  c_args: c_args,
+  install: false,
+)
+
+# Create dependency for other projects (needed by subprojects)
+wolfboot_dep = declare_dependency(
+  include_directories: inc_dirs,
+  link_with: libwolfboot,
+  compile_args: c_args,
+)
 
 # Main executable (if not library target)
 if target != 'library'
   # Try to find a linker script
-  
+
   linker_file = '@0@.ld'.format(target)
   link_args = []
   if (fs.exists('hal/' + linker_file))
     configure_file(
-        copy: true,
-        input: 'hal/' + linker_file,
-        output: linker_file,
+      copy: true,
+      input: 'hal/' + linker_file,
+      output: linker_file,
     )
   endif
 
   # Configuration data for target.h
   linker_conf_data = configuration_data()
   linker_conf_data.set('WOLFBOOT_PARTITION_SIZE', get_option('wolfboot_sector_size'))
-  linker_conf_data.set('WOLFBOOT_PARTITION_BOOT_ADDRESS', get_option('wolfboot_partition_boot_address'))
-  linker_conf_data.set('WOLFBOOT_PARTITION_UPDATE_ADDRESS', get_option('wolfboot_partition_update_address'))
-  linker_conf_data.set('WOLFBOOT_PARTITION_SWAP_ADDRESS', get_option('wolfboot_partition_swap_address'))
+  linker_conf_data.set(
+    'WOLFBOOT_PARTITION_BOOT_ADDRESS',
+    get_option('wolfboot_partition_boot_address'),
+  )
+  linker_conf_data.set(
+    'WOLFBOOT_PARTITION_UPDATE_ADDRESS',
+    get_option('wolfboot_partition_update_address'),
+  )
+  linker_conf_data.set(
+    'WOLFBOOT_PARTITION_SWAP_ADDRESS',
+    get_option('wolfboot_partition_swap_address'),
+  )
   linker_conf_data.set('BOOTLOADER_PARTITION_SIZE', get_option('wolfboot_partition_size'))
   linker_conf_data.set('WOLFBOOT_DTS_BOOT_ADDRESS', get_option('wolfboot_partition_boot_address'))
-  linker_conf_data.set('WOLFBOOT_DTS_UPDATE_ADDRESS', get_option('wolfboot_partition_update_address'))
+  linker_conf_data.set(
+    'WOLFBOOT_DTS_UPDATE_ADDRESS',
+    get_option('wolfboot_partition_update_address'),
+  )
   linker_conf_data.set('WOLFBOOT_LOAD_ADDRESS', get_option('wolfboot_load_address'))
   linker_conf_data.set('WOLFBOOT_LOAD_DTS_ADDRESS', get_option('wolfboot_load_address'))
 
-  
-
   linker_script = configure_file(
-  input : 'hal/@0@.ld'.format(target),
-  output : '@0@.ld'.format(target),
-  configuration : linker_conf_data,
-)
-  
-  link_args = ['-L' + meson.current_build_dir(),
-    '-T' + linker_file,]
-  
+    input: 'hal/@0@.ld'.format(target),
+    output: '@0@.ld'.format(target),
+    configuration: linker_conf_data,
+  )
+
+  link_args = [
+    '-L' + meson.current_build_dir(),
+    '-T' + linker_file,
+  ]
 
   if get_option('use_gcc_headless')
-    link_args += ['-Wl,--gc-sections', '-Wl,-Map=wolfboot.map', '-ffreestanding', '-nostartfiles']
+    link_args += [
+      '-Wl,--gc-sections',
+      '-Wl,-Map=wolfboot.map',
+      '-ffreestanding',
+      '-nostartfiles',
+    ]
   endif
 
-  wolfboot_exe = executable('wolfboot',
-    all_sources,
-    include_directories : [inc_dirs, build_inc_dirs],
-    c_args : c_args,
-    link_args : link_args,
-    install : false,
-    name_suffix : 'elf',
+  wolfboot_exe = executable(
+    'wolfboot',
+    [all_sources, keystore_source],
+    include_directories: [inc_dirs, build_inc_dirs],
+    c_args: c_args,
+    link_args: link_args,
+    install: false,
+    name_suffix: 'elf',
   )
 
   # Binary generation
@@ -567,21 +598,25 @@ if target != 'library'
 endif
 
 # Summary
-summary({
-  'Architecture' : arch,
-  'Target' : target,
-  'Signing' : sign,
-  'Hash' : hash,
-  'Debug' : debug,
-  'Encryption' : encrypt,
-  'TPM Support' : tpm_enabled,
-  'Build Keytools' : build_keytools,
-  'Build bin-assemble' : build_bin_assemble,
-}, section : 'WolfBoot Configuration')
+summary(
+  {
+    'Architecture': arch,
+    'Target': target,
+    'Signing': sign,
+    'Hash': hash,
+    'Debug': debug,
+    'Encryption': encrypt,
+    'TPM Support': tpm_enabled,
+    'Build Keytools': build_keytools,
+    'Build bin-assemble': build_bin_assemble,
+  },
+  section: 'WolfBoot Configuration',
+)
 
 # Print usage information about separate tool compilation
 if not build_keytools
-  message('''
+  message(
+    '''
 NOTE: Keytools are not built by default in this meson build.
 To build keytools separately (matching Makefile behavior), use:
   meson configure -Dbuild_keytools=true
@@ -590,5 +625,6 @@ To build keytools separately (matching Makefile behavior), use:
 Or build directly with:
   meson setup builddir -Dbuild_keytools=true
   meson compile -C builddir keytools
-  ''')
+  ''',
+  )
 endif
