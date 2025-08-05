@@ -439,9 +439,61 @@ libwolfboot = static_library('wolfboot',
   install : false,
 )
 
-# Subprojects
-subdir('tools/keytools')
-subdir('tools/bin-assemble') 
+# Create dependency for other projects (needed by subprojects)
+wolfboot_dep = declare_dependency(
+  include_directories : inc_dirs,
+  link_with : libwolfboot,
+  compile_args : c_args,
+)
+
+# Subprojects - Build tools separately like Makefile
+# Only build keytools and bin-assemble when explicitly requested
+build_keytools = get_option('build_keytools')
+build_bin_assemble = get_option('build_bin_assemble')
+
+# Create separate targets for tools (like Makefile)
+keytools_target = []
+bin_assemble_target = []
+otp_target = []
+
+if build_keytools
+  subdir('tools/keytools')
+  # Get the keytools from the subdirectory
+  keytools_target = get_variable('keytools_executables', [])
+  
+  # Add OTP tools if flash_otp_keystore is enabled (matching Makefile logic)
+  if get_option('flash_otp_keystore')
+    subdir('tools/keytools/otp')
+    otp_target = get_variable('otp_tools', [])
+  endif
+endif
+
+if build_bin_assemble  
+  subdir('tools/bin-assemble')
+  # Get the bin-assemble tool from the subdirectory  
+  bin_assemble_target = get_variable('bin_assemble_executable', [])
+endif
+
+# Add a custom target for keytools that matches Makefile behavior
+all_tools = keytools_target + otp_target
+keytools_custom = custom_target('keytools',
+  output : 'keytools.stamp',
+  command : [find_program('touch'), '@OUTPUT@'],
+  depends : all_tools,
+  build_by_default : false,
+  console : true,
+)
+
+# Add custom target for OTP tools specifically (matching Makefile otp target)
+if get_option('flash_otp_keystore') and build_keytools
+  otp_custom = custom_target('otp',
+    output : 'otp.stamp', 
+    command : [find_program('touch'), '@OUTPUT@'],
+    depends : otp_target,
+    build_by_default : false,
+    console : true,
+  )
+endif 
 
 # Main executable (if not library target)
 if target != 'library'
@@ -514,13 +566,6 @@ if target != 'library'
   # endif
 endif
 
-# Create dependency for other projects
-wolfboot_dep = declare_dependency(
-  include_directories : inc_dirs,
-  link_with : libwolfboot,
-  compile_args : c_args,
-)
-
 # Summary
 summary({
   'Architecture' : arch,
@@ -530,4 +575,20 @@ summary({
   'Debug' : debug,
   'Encryption' : encrypt,
   'TPM Support' : tpm_enabled,
+  'Build Keytools' : build_keytools,
+  'Build bin-assemble' : build_bin_assemble,
 }, section : 'WolfBoot Configuration')
+
+# Print usage information about separate tool compilation
+if not build_keytools
+  message('''
+NOTE: Keytools are not built by default in this meson build.
+To build keytools separately (matching Makefile behavior), use:
+  meson configure -Dbuild_keytools=true
+  meson compile keytools
+
+Or build directly with:
+  meson setup builddir -Dbuild_keytools=true
+  meson compile -C builddir keytools
+  ''')
+endif

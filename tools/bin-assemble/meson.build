@@ -12,3 +12,7 @@ bin_assemble = executable('bin-assemble',
   native: true,
   install : false,
 )
+
+# Export bin-assemble executable for parent scope (matching Makefile behavior)
+bin_assemble_executable = bin_assemble
+set_variable('bin_assemble_executable', bin_assemble_executable)

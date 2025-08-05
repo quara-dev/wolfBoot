@@ -84,4 +84,4 @@ if not meson.is_cross_build()
   )
 endif
 
-message('Built OTP tools: @0@'.format(', '.join([tool.name() for tool in otp_tools])))
+message('Built OTP tools: otp-keystore-gen and otp-keystore-primer')

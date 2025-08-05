@@ -113,3 +113,7 @@ endif
 if renesas_key_env != ''
   message('  - Renesas Key Type: @0@'.format(renesas_key_env))
 endif
+
+# Export keytools executables for parent scope (matching Makefile behavior)
+keytools_executables = [keygen, sign_tool]
+set_variable('keytools_executables', keytools_executables)
