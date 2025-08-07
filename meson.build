@@ -77,17 +77,24 @@ endif
 # Architecture-specific flags
 if arch == 'ARM'
   c_args += ['-DARCH_ARM']
+  # Add ARM-specific embedded flags (matching CMakeLists.txt)
+  if get_option('use_gcc_headless')
+    c_args += ['-ffreestanding', '-nostartfiles', '-fomit-frame-pointer']
+  endif
 elif arch == 'AARCH64'
   c_args += ['-DARCH_AARCH64']
   # Add AArch64 boot sources
   if target != 'library'
     wolfboot_sources += ['src/boot_aarch64.c', 'src/boot_aarch64_start.S']
   endif
+  # Add additional AARCH64 flags from CMakeLists.txt
+  c_args += ['-DNO_QNX', '-DWOLFBOOT_DUALBOOT', '-DMMU']
 elif arch == 'x86_64'
   c_args += ['-DARCH_x86_64', '-DFAST_MEMCPY']
   # Add x86_64 EFI boot source for EFI targets
   if target == 'x86_64_efi'
     wolfboot_sources += ['src/boot_x86_64.c']
+    c_args += ['-DTARGET_X86_64_EFI']
     if debug
       c_args += ['-DWOLFBOOT_DEBUG_EFI=1']
     endif
@@ -98,23 +105,103 @@ elif arch == 'RISCV'
   c_args += ['-DARCH_RISCV']
 endif
 
-# Signing algorithm flags
+# Add target-specific definition (matching CMakeLists.txt)
+c_args += ['-DTARGET_@0@'.format(target.to_upper())]
+
+# Add ARCH_FLASH_OFFSET (matching CMakeLists.txt)
+arch_flash_offset = get_option('arch_flash_offset')
+c_args += ['-DARCH_FLASH_OFFSET=@0@'.format(arch_flash_offset)]
+
+# Signing algorithm flags with stack usage and image header size (matching CMakeLists.txt)
+image_header_size = get_option('image_header_size')
+stack_usage = 1216  # Default value
+
 if sign == 'ECC256'
   c_args += ['-DWOLFBOOT_SIGN_ECC256']
+  if get_option('wolfboot_small_stack')
+    stack_usage = 4096
+  elif not get_option('spmath')
+    stack_usage = 5264
+  else
+    stack_usage = 7632
+  endif
+  if image_header_size < 256
+    image_header_size = 256
+  endif
 elif sign == 'ECC384'
   c_args += ['-DWOLFBOOT_SIGN_ECC384']
+  if get_option('wolfboot_small_stack')
+    stack_usage = 5880
+  elif not get_option('spmath')
+    stack_usage = 11248
+  else
+    stack_usage = 11216
+  endif
+  if image_header_size < 512
+    image_header_size = 512
+  endif
 elif sign == 'ECC521'
   c_args += ['-DWOLFBOOT_SIGN_ECC521']
+  if get_option('wolfboot_small_stack')
+    stack_usage = 4096
+  elif not get_option('spmath')
+    stack_usage = 7352
+  else
+    stack_usage = 3896
+  endif
+  if image_header_size < 512
+    image_header_size = 512
+  endif
 elif sign == 'ED25519'
   c_args += ['-DWOLFBOOT_SIGN_ED25519']
+  stack_usage = 5000
+  if image_header_size < 256
+    image_header_size = 256
+  endif
 elif sign == 'ED448'
   c_args += ['-DWOLFBOOT_SIGN_ED448']
+  if get_option('wolfboot_small_stack')
+    stack_usage = 1024
+  else
+    stack_usage = 4376
+  endif
+  if image_header_size < 512
+    image_header_size = 512
+  endif
 elif sign == 'RSA2048'
   c_args += ['-DWOLFBOOT_SIGN_RSA2048']
+  if get_option('wolfboot_small_stack')
+    if not get_option('spmath')
+      stack_usage = 5008
+    else
+      stack_usage = 4096
+    endif
+  elif not get_option('spmath')
+    stack_usage = 35952
+  else
+    stack_usage = 17568
+  endif
+  if image_header_size < 512
+    image_header_size = 512
+  endif
 elif sign == 'RSA3072'
   c_args += ['-DWOLFBOOT_SIGN_RSA3072']
 elif sign == 'RSA4096'
   c_args += ['-DWOLFBOOT_SIGN_RSA4096']
+  if get_option('wolfboot_small_stack')
+    if not get_option('spmath')
+      stack_usage = 5888
+    else
+      stack_usage = 5768
+    endif
+  elif not get_option('spmath')
+    stack_usage = 69232
+  else
+    stack_usage = 18064
+  endif
+  if image_header_size < 1024
+    image_header_size = 1024
+  endif
 elif sign == 'LMS'
   c_args += ['-DWOLFBOOT_SIGN_LMS']
   # LMS configuration flags matching options.mk
@@ -140,6 +227,24 @@ elif sign == 'ML_DSA'
   c_args += ['-DWOLFBOOT_SIGN_ML_DSA']
 elif sign == 'NONE'
   c_args += ['-DWOLFBOOT_NO_SIGN']
+  if hash == 'SHA384'
+    stack_usage = 3760
+  else
+    stack_usage = 1216
+  endif
+endif
+
+# Add IMAGE_HEADER_SIZE and stack usage warnings (matching CMakeLists.txt)
+c_args += ['-DIMAGE_HEADER_SIZE=@0@'.format(image_header_size)]
+
+# Add stack usage warning if supported by compiler
+if cc.has_argument('-Wstack-usage=@0@'.format(stack_usage))
+  c_args += ['-Wstack-usage=@0@'.format(stack_usage)]
+endif
+
+# Add other warnings from CMakeLists.txt
+if cc.has_argument('-Wno-unused')
+  c_args += ['-Wno-unused']
 endif
 
 # Hash algorithm flags
@@ -151,15 +256,16 @@ elif hash == 'SHA3'
   c_args += ['-DWOLFBOOT_HASH_SHA3']
 endif
 
-# Encryption flags
+# Encryption flags (matching CMakeLists.txt)
 if encrypt
   c_args += ['-DEXT_ENCRYPTED=1']
-  if get_option('encrypt_with_chacha')
-    c_args += ['-DENCRYPT_WITH_CHACHA', '-DHAVE_CHACHA']
-  elif get_option('encrypt_with_aes128')
+  if get_option('encrypt_with_aes128')
     c_args += ['-DENCRYPT_WITH_AES128', '-DWOLFSSL_AES_128']
   elif get_option('encrypt_with_aes256')
     c_args += ['-DENCRYPT_WITH_AES256', '-DWOLFSSL_AES_256']
+  else
+    # Default to ChaCha if no specific AES mode is selected (like CMakeLists.txt)
+    c_args += ['-DENCRYPT_WITH_CHACHA', '-DHAVE_CHACHA']
   endif
   
   # Encryption cache support
@@ -234,6 +340,31 @@ if get_option('wolfboot_small_stack')
   c_args += ['-DWOLFBOOT_SMALL_STACK', '-DXMALLOC_USER']
 endif
 
+# Additional options from CMakeLists.txt
+if get_option('flags_home')
+  c_args += ['-DFLAGS_HOME=1']
+endif
+
+if get_option('flags_invert')
+  c_args += ['-DWOLFBOOT_FLAGS_INVERT=1']
+endif
+
+if get_option('no_mpu')
+  c_args += ['-DWOLFBOOT_NO_MPU']
+endif
+
+if get_option('no_xip')
+  c_args += ['-DWOLFBOOT_NO_XIP']
+endif
+
+if get_option('armored')
+  c_args += ['-DWOLFBOOT_ARMORED']
+endif
+
+# Add WOLFBOOT_VERSION (matching CMakeLists.txt)
+wolfboot_version = get_option('wolfboot_version')
+c_args += ['-DWOLFBOOT_VERSION=@0@'.format(wolfboot_version)]
+
 c_args += ['-DCLOCK_SPEED=@0@'.format(get_option('clock_speed'))]
 c_args += ['-DSTM32_PLLM=@0@'.format(get_option('stm32_pllm'))]
 c_args += ['-DSTM32_PLLN=@0@'.format(get_option('stm32_plln'))]
@@ -305,6 +436,11 @@ wolfboot_sources = [
   'src/libwolfboot.c',
   'hal/hal.c',
 ]
+
+# Add xmalloc.c when small stack is enabled (matching CMakeLists.txt)
+if get_option('wolfboot_small_stack')
+  wolfboot_sources += ['src/xmalloc.c']
+endif
 
 # Add loader if not disabled
 if not get_option('no_loader')
@@ -476,18 +612,43 @@ if encrypt
   endif
 endif
 
+# Flash driver configuration (matching CMakeLists.txt logic)
+flash_driver_sources = []
+
+# Set EXT_FLASH based on flash drivers (like CMakeLists.txt)
+ext_flash_enabled = (
+  get_option('spi_flash') or 
+  get_option('qspi_flash') or 
+  get_option('octospi_flash') or
+  get_option('uart_flash') or
+  get_option('ext_flash')
+)
+
+if ext_flash_enabled
+  c_args += ['-DEXT_FLASH=1', '-DPART_UPDATE_EXT=1', '-DPART_SWAP_EXT=1']
+  if get_option('no_xip')
+    c_args += ['-DPART_BOOT_EXT=1']
+  endif
+endif
+
 # Flash driver sources
 if get_option('spi_flash')
-  wolfboot_sources += ['src/spi_flash.c']
+  c_args += ['-DSPI_FLASH=1']
+  flash_driver_sources += ['src/spi_flash.c']
 endif
 
 if get_option('qspi_flash')
-  wolfboot_sources += ['src/qspi_flash.c']
+  c_args += ['-DQSPI_FLASH=1']
+  flash_driver_sources += ['src/qspi_flash.c']
+endif
+
+if get_option('octospi_flash')
+  c_args += ['-DOCTOSPI_FLASH=1', '-DQSPI_FLASH=1']
 endif
 
 if get_option('uart_flash')
-  wolfboot_sources += ['src/uart_flash.c']
   c_args += ['-DUART_FLASH=1']
+  flash_driver_sources += ['src/uart_flash.c']
 endif
 
 # TPM sources
@@ -524,7 +685,16 @@ endif
 if get_option('delta_updates')
   wolfboot_sources += ['src/delta.c']
   c_args += ['-DDELTA_UPDATES']
+  
+  # Add delta block size if defined
+  delta_block_size = get_option('delta_block_size')
+  if delta_block_size > 0
+    c_args += ['-DDELTA_BLOCK_SIZE=@0@'.format(delta_block_size)]
+  endif
 endif
+
+# Add flash driver sources to main wolfboot sources
+wolfboot_sources += flash_driver_sources
 
 # Subprojects - Build tools separately like Makefile
 # Only build keytools and bin-assemble when explicitly requested
@@ -653,6 +823,11 @@ if target != 'library'
       '-ffreestanding',
       '-nostartfiles',
     ]
+    
+    # Add ARM-specific linker flags (matching CMakeLists.txt)
+    if arch == 'ARM'
+      link_args += ['-fomit-frame-pointer']
+    endif
   endif
 
   wolfboot_exe = executable(
