@@ -407,19 +407,14 @@ else
   c_args += ['-DUSE_FAST_MATH']
 endif
 
-# WolfSSL directory
-WolfSSL_inc = include_directories('lib/wolfssl')
-
 # Include directories
 local_inc_dirs = include_directories('.', 'include')
+wolfssl_inc_dirs = include_directories('lib/wolfssl')
 
 inc_dirs = [
   local_inc_dirs,
-  WolfSSL_inc,
+  wolfssl_inc_dirs,
 ]
-
-# WolfBoot delta update support
-wolfboot_delta_sources = files('src/delta.c')
 
 # Additional build directory for generated files
 build_inc_dirs = include_directories(['.'], is_system: false)
@@ -507,122 +502,8 @@ else
   public_key_sources += [keystore_none]
 endif
 
-# Base WolfCrypt sources (matching arch.mk defaults)
-wolfcrypt_sources = [
-  'lib/wolfssl/wolfcrypt/src/sha256.c',
-  'lib/wolfssl/wolfcrypt/src/hash.c',
-  'lib/wolfssl/wolfcrypt/src/memory.c',
-  'lib/wolfssl/wolfcrypt/src/wc_port.c',
-  'lib/wolfssl/wolfcrypt/src/wolfmath.c',
-  'lib/wolfssl/wolfcrypt/src/asn.c', # From options.mk
-  'lib/wolfssl/wolfcrypt/src/logging.c', # Debug logging support from arch.mk
-]
-
-# Math library sources
-if get_option('spmath')
-  wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/sp_int.c']
-  
-  # Add Cortex-M optimized SP math if building for ARM Cortex-M and assembly is enabled
-  # Only include when actually cross-compiling for ARM (not on native x86_64)
-  if arch == 'ARM' and not get_option('no_asm') and not get_option('no_arm_asm') and meson.is_cross_build()
-    cortex_m_targets = (
-      get_option('cortex_m0') or 
-      get_option('cortex_m3') or 
-      get_option('cortex_m33') or 
-      get_option('cortex_m7')
-    )
-    if cortex_m_targets
-      wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/sp_cortexm.c']
-      # Add corresponding compiler flags
-      c_args += ['-DWOLFSSL_SP_ASM', '-DWOLFSSL_SP_ARM_CORTEX_M_ASM']
-      if get_option('cortex_m7')
-        c_args += ['-DWOLFSSL_ARM_ARCH=7']
-      elif get_option('cortex_m3')
-        c_args += ['-DWOLFSSL_SP_NO_UMAAL', '-DWOLFSSL_ARM_ARCH=7']
-      endif
-    else
-      # Default to C implementation for other ARM targets
-      wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/sp_c32.c']
-    endif
-  else
-    # Use C implementation when assembly is disabled or not cross-compiling
-    if arch == 'ARM' or arch == 'AARCH64'
-      wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/sp_c32.c']
-    elif arch == 'x86_64'
-      # x86_64 specific SP math handling
-      if get_option('no_asm')
-        wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/sp_c64.c']
-      else
-        wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/sp_x86_64.c']
-      endif
-    else
-      wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/sp_c64.c']
-    endif
-  endif
-else
-  wolfcrypt_sources += [
-    'lib/wolfssl/wolfcrypt/src/integer.c',
-    'lib/wolfssl/wolfcrypt/src/tfm.c',
-  ]
-endif
-
-# Signature algorithm specific sources (matching options.mk)
-if sign == 'ECC256' or sign == 'ECC384' or sign == 'ECC521'
-  wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/ecc.c']
-elif sign == 'ED25519'
-  wolfcrypt_sources += [
-    'lib/wolfssl/wolfcrypt/src/ed25519.c',
-    'lib/wolfssl/wolfcrypt/src/ge_low_mem.c',
-    'lib/wolfssl/wolfcrypt/src/fe_low_mem.c',
-    'lib/wolfssl/wolfcrypt/src/sha512.c',
-  ]
-elif sign == 'ED448'
-  wolfcrypt_sources += [
-    'lib/wolfssl/wolfcrypt/src/ed448.c',
-    'lib/wolfssl/wolfcrypt/src/ge_low_mem.c',
-    'lib/wolfssl/wolfcrypt/src/ge_448.c',
-    'lib/wolfssl/wolfcrypt/src/fe_448.c',
-    'lib/wolfssl/wolfcrypt/src/fe_low_mem.c',
-  ]
-  # ED448 adds SHA3 if HASH is not already SHA3 (from options.mk)
-  if hash != 'SHA3'
-    wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/sha3.c']
-  endif
-elif sign.startswith('RSA')
-  wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/rsa.c']
-elif sign == 'LMS'
-  wolfcrypt_sources += [
-    'lib/wolfssl/wolfcrypt/src/wc_lms.c',
-    'lib/wolfssl/wolfcrypt/src/wc_lms_impl.c',
-  ]
-elif sign == 'XMSS'
-  wolfcrypt_sources += [
-    'lib/wolfssl/wolfcrypt/src/wc_xmss.c',
-    'lib/wolfssl/wolfcrypt/src/wc_xmss_impl.c',
-  ]
-elif sign == 'ML_DSA'
-  wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/dilithium.c']
-  # ML_DSA adds SHA3 if HASH is not already SHA3 (from options.mk)
-  if hash != 'SHA3'
-    wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/sha3.c']
-  endif
-endif
-
-# Hash algorithm specific sources
-if hash == 'SHA384'
-  wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/sha512.c']
-elif hash == 'SHA3'
-  wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/sha3.c']
-endif
-
-# Encryption sources
-if encrypt
-  if get_option('encrypt_with_chacha')
-    wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/chacha.c']
-  elif get_option('encrypt_with_aes128') or get_option('encrypt_with_aes256')
-    wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/aes.c']
-  endif
-endif
+# Configure subdir to handle lib libraries
+subdir('lib')
 
 # Flash driver configuration (matching CMakeLists.txt logic)
 flash_driver_sources = []
@@ -685,7 +566,8 @@ if tpm_enabled
   endif
 endif
 
-# Delta update sources
+# Delta update sources - always define for tools, conditionally include in main build
+wolfboot_delta_sources = ['../../src/delta.c']  # Path relative to tools directory
 if get_option('delta_updates')
   wolfboot_sources += ['src/delta.c']
   c_args += ['-DDELTA_UPDATES']
@@ -753,15 +635,6 @@ if get_option('flash_otp_keystore') and build_keytools
 endif
 
 # Build separate static libraries like CMakeLists.txt
-
-# 1. WolfCrypt library (cryptographic functions)
-libwolfcrypt = static_library(
-  'wolfcrypt',
-  wolfcrypt_sources,
-  include_directories: [inc_dirs, build_inc_dirs],
-  c_args: c_args + ['-Wno-unused', '-Wno-array-bounds'],
-  install: false,
-)
 
 # 2. WolfTPM library (if TPM support is enabled and not a subproject)
 libwolftpm = []

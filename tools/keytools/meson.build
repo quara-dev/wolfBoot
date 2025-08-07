@@ -1,7 +1,7 @@
 # WolfBoot Key Tools Build - Full Makefile Implementation
 
 # Include directories
-keytools_inc = inc_dirs
+keytools_inc = inc_dirs + [include_directories('../../lib/wolfssl')]
 
 # Base compiler flags matching Makefile
 keytools_cflags = [
