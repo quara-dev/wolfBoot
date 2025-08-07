@@ -763,10 +763,10 @@ libwolfcrypt = static_library(
   install: false,
 )
 
-# 2. WolfTPM library (if TPM support is enabled)
+# 2. WolfTPM library (if TPM support is enabled and not a subproject)
 libwolftpm = []
 wolftpm_sources = []
-if tpm_enabled and fs.exists('lib/wolfTPM')
+if tpm_enabled and fs.exists('lib/wolfTPM') and not meson.is_subproject()
   wolftpm_sources = [
     'lib/wolfTPM/src/tpm2.c',
     'lib/wolfTPM/src/tpm2_packet.c',
@@ -857,9 +857,9 @@ if not meson.is_subproject()
   if sign != 'NONE'
     link_libraries += [libpublic_key]
   endif
-endif
-if tpm_enabled and fs.exists('lib/wolfTPM')
-  link_libraries += [libwolftpm]
+  if tpm_enabled and fs.exists('lib/wolfTPM')
+    link_libraries += [libwolftpm]
+  endif
 endif
 
 libwolfboot = static_library(
@@ -872,11 +872,22 @@ libwolfboot = static_library(
 )
 
 # Create dependency for other projects (needed by subprojects)
-wolfboot_dep = declare_dependency(
-  include_directories: inc_dirs,
-  link_with: [libwolfboot] + link_libraries,
-  compile_args: c_args,
-)
+if meson.is_subproject()
+  # For subprojects, only expose libwolfcrypt and libwolfboot
+  subproject_link_libraries = [libwolfcrypt, libwolfboot]
+  wolfboot_dep = declare_dependency(
+    include_directories: inc_dirs,
+    link_with: subproject_link_libraries,
+    compile_args: c_args,
+  )
+else
+  # For standalone builds, expose all libraries
+  wolfboot_dep = declare_dependency(
+    include_directories: inc_dirs,
+    link_with: [libwolfboot] + link_libraries,
+    compile_args: c_args,
+  )
+endif
 
 # Main executable (if not library target and not a subproject)
 if target != 'library' and not meson.is_subproject()
@@ -958,16 +969,16 @@ endif
 
 # Summary
 libraries_built = 'wolfcrypt'
-if tpm_enabled and fs.exists('lib/wolfTPM')
-  libraries_built += ', wolftpm'
-endif
 if not meson.is_subproject()
+  if tpm_enabled and fs.exists('lib/wolfTPM')
+    libraries_built += ', wolftpm'
+  endif
   libraries_built += ', wolfboothal'
   if sign != 'NONE'
     libraries_built += ', public_key'
   endif
-  libraries_built += ', wolfboot'
 endif
+libraries_built += ', wolfboot'
 
 summary(
   {
