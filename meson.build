@@ -451,7 +451,10 @@ if not get_option('no_loader')
 endif
 
 # Add architecture-specific sources (matching CMakeLists.txt)
-if arch == 'AARCH64' and target != 'library'
+if arch == 'ARM' and target != 'library'
+  # ARM has boot source
+  wolfboot_sources += ['src/boot_arm.c']
+elif arch == 'AARCH64' and target != 'library'
   # AArch64 has additional boot sources including update_ram.c
   wolfboot_sources += ['src/boot_aarch64.c', 'src/boot_aarch64_start.S', 'src/update_ram.c']
 elif arch == 'x86_64' and target == 'x86_64_efi'
@@ -707,7 +710,9 @@ if not get_option('no_loader')
 endif
 
 # Add architecture-specific boot sources
-if arch == 'AARCH64' and target != 'library'
+if arch == 'ARM' and target != 'library'
+  core_wolfboot_sources += ['src/boot_arm.c']
+elif arch == 'AARCH64' and target != 'library'
   core_wolfboot_sources += ['src/boot_aarch64.c', 'src/boot_aarch64_start.S']
 elif arch == 'x86_64' and target == 'x86_64_efi'
   core_wolfboot_sources += ['src/boot_x86_64.c']
