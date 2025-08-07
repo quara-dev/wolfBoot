@@ -672,19 +672,11 @@ tpm_enabled = (
 )
 
 if tpm_enabled
-  wolfboot_sources += ['src/tpm.c']
   c_args += ['-DWOLFBOOT_TPM', '-DWOLFTPM_SMALL_STACK', '-DWOLFTPM_AUTODETECT']
 
-  # Add wolfTPM sources if available
+  # Add additional wolfSSL crypto sources needed for TPM to wolfcrypt
   if fs.exists('lib/wolfTPM')
     inc_dirs += include_directories('lib/wolfTPM')
-    wolfboot_sources += [
-      'lib/wolfTPM/src/tpm2.c',
-      'lib/wolfTPM/src/tpm2_packet.c',
-      'lib/wolfTPM/src/tpm2_tis.c',
-      'lib/wolfTPM/src/tpm2_wrap.c',
-      'lib/wolfTPM/src/tpm2_param_enc.c',
-    ]
     wolfcrypt_sources += [
       'lib/wolfssl/wolfcrypt/src/aes.c',
       'lib/wolfssl/wolfcrypt/src/hmac.c',
@@ -760,27 +752,134 @@ if get_option('flash_otp_keystore') and build_keytools
   )
 endif
 
-# All sources combined
-all_sources = wolfboot_sources + wolfcrypt_sources + public_key_sources
+# Build separate static libraries like CMakeLists.txt
 
-# Main wolfboot library
+# 1. WolfCrypt library (cryptographic functions)
+libwolfcrypt = static_library(
+  'wolfcrypt',
+  wolfcrypt_sources,
+  include_directories: [inc_dirs, build_inc_dirs],
+  c_args: c_args + ['-Wno-unused', '-Wno-array-bounds'],
+  install: false,
+)
+
+# 2. WolfTPM library (if TPM support is enabled)
+libwolftpm = []
+wolftpm_sources = []
+if tpm_enabled and fs.exists('lib/wolfTPM')
+  wolftpm_sources = [
+    'lib/wolfTPM/src/tpm2.c',
+    'lib/wolfTPM/src/tpm2_packet.c',
+    'lib/wolfTPM/src/tpm2_tis.c',
+    'lib/wolfTPM/src/tpm2_wrap.c',
+    'lib/wolfTPM/src/tpm2_param_enc.c',
+  ]
+  
+  libwolftpm = static_library(
+    'wolftpm',
+    wolftpm_sources,
+    include_directories: [inc_dirs, build_inc_dirs],
+    c_args: c_args,
+    install: false,
+  )
+endif
+
+# 3. WolfBoot HAL library (hardware abstraction layer) - only build if not a subproject
+libwolfboothal = []
+if not meson.is_subproject()
+  hal_sources = ['hal/hal.c'] + flash_driver_sources
+  if target != 'library'
+    if fs.exists('hal/@0@.c'.format(target))
+      hal_sources += ['hal/@0@.c'.format(target)]
+    else
+      hal_sources += ['hal/skeleton.c']
+    endif
+  endif
+
+  libwolfboothal = static_library(
+    'wolfboothal',
+    hal_sources,
+    include_directories: [inc_dirs, build_inc_dirs],
+    c_args: c_args,
+    install: false,
+  )
+endif
+
+# 4. Public key library (keystore sources, only if signing is enabled and not a subproject)
+libpublic_key = []
+if sign != 'NONE' and not meson.is_subproject()
+  libpublic_key = static_library(
+    'public_key',
+    public_key_sources,
+    include_directories: [inc_dirs, build_inc_dirs],
+    c_args: c_args,
+    install: false,
+  )
+endif
+
+# 5. Main wolfboot library (core sources that link everything together)
+core_wolfboot_sources = [
+  'src/string.c',
+  'src/image.c',
+  'src/libwolfboot.c',
+] + update_sources
+
+# Add additional sources based on configuration
+if get_option('wolfboot_small_stack')
+  core_wolfboot_sources += ['src/xmalloc.c']
+endif
+
+if not get_option('no_loader')
+  core_wolfboot_sources += ['src/loader.c']
+endif
+
+# Add architecture-specific boot sources
+if arch == 'AARCH64' and target != 'library'
+  core_wolfboot_sources += ['src/boot_aarch64.c', 'src/boot_aarch64_start.S']
+elif arch == 'x86_64' and target == 'x86_64_efi'
+  core_wolfboot_sources += ['src/boot_x86_64.c']
+endif
+
+# Add TPM sources if enabled
+if tpm_enabled
+  core_wolfboot_sources += ['src/tpm.c']
+endif
+
+# Add delta update sources if enabled
+if get_option('delta_updates')
+  core_wolfboot_sources += ['src/delta.c']
+endif
+
+# Link libraries list
+link_libraries = [libwolfcrypt]
+if not meson.is_subproject()
+  link_libraries += [libwolfboothal]
+  if sign != 'NONE'
+    link_libraries += [libpublic_key]
+  endif
+endif
+if tpm_enabled and fs.exists('lib/wolfTPM')
+  link_libraries += [libwolftpm]
+endif
+
 libwolfboot = static_library(
   'wolfboot',
-  all_sources,
+  core_wolfboot_sources,
   include_directories: [inc_dirs, build_inc_dirs],
-  c_args: c_args,
+  c_args: c_args + ['-Wno-unused'],
+  link_with: link_libraries,
   install: false,
 )
 
 # Create dependency for other projects (needed by subprojects)
 wolfboot_dep = declare_dependency(
   include_directories: inc_dirs,
-  link_with: libwolfboot,
+  link_with: [libwolfboot] + link_libraries,
   compile_args: c_args,
 )
 
-# Main executable (if not library target)
-if target != 'library'
+# Main executable (if not library target and not a subproject)
+if target != 'library' and not meson.is_subproject()
   # Try to find a linker script
 
   linker_file = '@0@.ld'.format(target)
@@ -844,10 +943,12 @@ if target != 'library'
 
   wolfboot_exe = executable(
     'wolfboot',
-    all_sources,
+    # Only include the main source files, libraries are linked separately
+    core_wolfboot_sources,
     include_directories: [inc_dirs, build_inc_dirs],
     c_args: c_args,
     link_args: link_args,
+    link_with: link_libraries,
     install: false,
     name_suffix: 'elf',
     build_by_default: meson.is_subproject() == false,
@@ -856,6 +957,18 @@ if target != 'library'
 endif
 
 # Summary
+libraries_built = 'wolfcrypt'
+if tpm_enabled and fs.exists('lib/wolfTPM')
+  libraries_built += ', wolftpm'
+endif
+if not meson.is_subproject()
+  libraries_built += ', wolfboothal'
+  if sign != 'NONE'
+    libraries_built += ', public_key'
+  endif
+  libraries_built += ', wolfboot'
+endif
+
 summary(
   {
     'Architecture': arch,
@@ -867,6 +980,8 @@ summary(
     'TPM Support': tpm_enabled,
     'Build Keytools': build_keytools,
     'Build bin-assemble': build_bin_assemble,
+    'Is Subproject': meson.is_subproject(),
+    'Libraries': libraries_built,
   },
   section: 'WolfBoot Configuration',
 )
