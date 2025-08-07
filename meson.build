@@ -577,24 +577,6 @@ if target != 'library'
     name_suffix: 'elf',
   )
 
-  # Binary generation
-  # objcopy = find_program('objcopy', required: false)
-  # if objcopy.found()
-  #   wolfboot_bin = custom_target('wolfboot.bin',
-  #     input : wolfboot_exe,
-  #     output : 'wolfboot.bin',
-  #     command : [objcopy, '-O', 'binary', '@INPUT@', '@OUTPUT@'],
-  #     install : false,
-  #     build_by_default : true,
-  #   )
-
-  #   wolfboot_hex = custom_target('wolfboot.hex',
-  #     input : wolfboot_exe,
-  #     output : 'wolfboot.hex',
-  #     command : [objcopy, '-O', 'ihex', '@INPUT@', '@OUTPUT@'],
-  #     install : false,
-  #   )
-  # endif
 endif
 
 # Summary

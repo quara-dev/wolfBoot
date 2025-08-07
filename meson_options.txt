@@ -129,7 +129,7 @@ option(
 option(
   'wolfboot_small_stack',
   type: 'boolean',
-  value: false,
+  value: true,
   description: 'Enable small stack configuration',
 )
 
@@ -272,7 +272,7 @@ option(
 option(
   'allow_downgrade',
   type: 'boolean',
-  value: false,
+  value: true,
   description: 'Allow firmware downgrade',
 )
 
@@ -286,14 +286,14 @@ option(
 option(
   'disable_backup',
   type: 'boolean',
-  value: false,
+  value: true,
   description: 'Disable backup functionality',
 )
 
 option(
   'delta_updates',
   type: 'boolean',
-  value: false,
+  value: true,
   description: 'Enable delta updates',
 )
 
@@ -308,7 +308,7 @@ option(
 option(
   'spmath',
   type: 'boolean',
-  value: false,
+  value: true,
   description: 'Use wolfSSL SP Math library',
 )
 
@@ -323,7 +323,7 @@ option(
 option(
   'no_mpu',
   type: 'boolean',
-  value: false,
+  value: true,
   description: 'Disable Memory Protection Unit',
 )
 
@@ -345,7 +345,7 @@ option(
   description: 'Target Cortex-M33',
 )
 
-option('cortex_m7', type: 'boolean', value: false, description: 'Target Cortex-M7')
+option('cortex_m7', type: 'boolean', value: true, description: 'Target Cortex-M7')
 
 option('tzen', type: 'boolean', value: false, description: 'Enable TrustZone')
 
