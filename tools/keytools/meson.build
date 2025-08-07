@@ -72,6 +72,47 @@ endif
 
 
 
+# Comprehensive WolfSSL cryptographic source files for keytools
+wolfssl_sources = files(
+  '../../lib/wolfssl/wolfcrypt/src/aes.c',
+  '../../lib/wolfssl/wolfcrypt/src/asn.c',
+  '../../lib/wolfssl/wolfcrypt/src/chacha.c',
+  '../../lib/wolfssl/wolfcrypt/src/coding.c',
+  # ML-DSA (Dilithium) support
+  '../../lib/wolfssl/wolfcrypt/src/dilithium.c',
+  '../../lib/wolfssl/wolfcrypt/src/ecc.c',
+  '../../lib/wolfssl/wolfcrypt/src/ed25519.c',
+  '../../lib/wolfssl/wolfcrypt/src/ed448.c',
+  '../../lib/wolfssl/wolfcrypt/src/fe_448.c',
+  '../../lib/wolfssl/wolfcrypt/src/fe_operations.c',
+  '../../lib/wolfssl/wolfcrypt/src/ge_448.c',
+  '../../lib/wolfssl/wolfcrypt/src/ge_operations.c',
+  '../../lib/wolfssl/wolfcrypt/src/hash.c',
+  '../../lib/wolfssl/wolfcrypt/src/logging.c',
+  '../../lib/wolfssl/wolfcrypt/src/memory.c',
+  '../../lib/wolfssl/wolfcrypt/src/random.c',
+  '../../lib/wolfssl/wolfcrypt/src/rsa.c',
+  '../../lib/wolfssl/wolfcrypt/src/sha256.c',
+  '../../lib/wolfssl/wolfcrypt/src/sha3.c',
+  '../../lib/wolfssl/wolfcrypt/src/sha512.c',
+  '../../lib/wolfssl/wolfcrypt/src/sp_c32.c',
+  '../../lib/wolfssl/wolfcrypt/src/sp_c64.c',
+  '../../lib/wolfssl/wolfcrypt/src/sp_int.c',
+  '../../lib/wolfssl/wolfcrypt/src/tfm.c',
+  # LMS support
+  '../../lib/wolfssl/wolfcrypt/src/wc_lms.c',
+  '../../lib/wolfssl/wolfcrypt/src/wc_lms_impl.c',
+  '../../lib/wolfssl/wolfcrypt/src/wc_port.c',
+  # XMSS support
+  '../../lib/wolfssl/wolfcrypt/src/wc_xmss.c',
+  '../../lib/wolfssl/wolfcrypt/src/wc_xmss_impl.c',
+  '../../lib/wolfssl/wolfcrypt/src/wolfmath.c',
+  # Additional needed sources for keytools
+  '../../lib/wolfssl/wolfcrypt/src/fe_low_mem.c',
+  '../../lib/wolfssl/wolfcrypt/src/ge_low_mem.c',
+  '../../lib/wolfssl/wolfcrypt/src/integer.c',
+)
+
 # Combine all sources
 all_sources = wolfssl_sources + wolfboot_delta_sources
 

@@ -219,10 +219,10 @@ target_h = configure_file(
 
 # Math library selection
 if get_option('spmath')
-  c_args += ['-DWOLFSSL_SP_MATH']
   if get_option('spmathall')
     c_args += ['-DWOLFSSL_SP_MATH_ALL']
   endif
+  # Note: WOLFSSL_SP_MATH is defined in user_settings.h, don't redefine here
 else
   c_args += ['-DUSE_FAST_MATH']
 endif
@@ -237,43 +237,6 @@ inc_dirs = [
   local_inc_dirs,
   WolfSSL_inc,
 ]
-
-# WolfSSL cryptographic source files (matching Makefile OBJS_REAL)
-wolfssl_sources = files(
-  'lib/wolfssl/wolfcrypt/src/aes.c',
-  'lib/wolfssl/wolfcrypt/src/asn.c',
-  'lib/wolfssl/wolfcrypt/src/chacha.c',
-  'lib/wolfssl/wolfcrypt/src/coding.c',
-  # ML-DSA (Dilithium) support
-  'lib/wolfssl/wolfcrypt/src/dilithium.c',
-  'lib/wolfssl/wolfcrypt/src/ecc.c',
-  'lib/wolfssl/wolfcrypt/src/ed25519.c',
-  'lib/wolfssl/wolfcrypt/src/ed448.c',
-  'lib/wolfssl/wolfcrypt/src/fe_448.c',
-  'lib/wolfssl/wolfcrypt/src/fe_operations.c',
-  'lib/wolfssl/wolfcrypt/src/ge_448.c',
-  'lib/wolfssl/wolfcrypt/src/ge_operations.c',
-  'lib/wolfssl/wolfcrypt/src/hash.c',
-  'lib/wolfssl/wolfcrypt/src/logging.c',
-  'lib/wolfssl/wolfcrypt/src/memory.c',
-  'lib/wolfssl/wolfcrypt/src/random.c',
-  'lib/wolfssl/wolfcrypt/src/rsa.c',
-  'lib/wolfssl/wolfcrypt/src/sha256.c',
-  'lib/wolfssl/wolfcrypt/src/sha3.c',
-  'lib/wolfssl/wolfcrypt/src/sha512.c',
-  'lib/wolfssl/wolfcrypt/src/sp_c32.c',
-  'lib/wolfssl/wolfcrypt/src/sp_c64.c',
-  'lib/wolfssl/wolfcrypt/src/sp_int.c',
-  'lib/wolfssl/wolfcrypt/src/tfm.c',
-  # LMS support
-  'lib/wolfssl/wolfcrypt/src/wc_lms.c',
-  'lib/wolfssl/wolfcrypt/src/wc_lms_impl.c',
-  'lib/wolfssl/wolfcrypt/src/wc_port.c',
-  # XMSS support
-  'lib/wolfssl/wolfcrypt/src/wc_xmss.c',
-  'lib/wolfssl/wolfcrypt/src/wc_xmss_impl.c',
-  'lib/wolfssl/wolfcrypt/src/wolfmath.c',
-)
 
 # WolfBoot delta update support
 wolfboot_delta_sources = files('src/delta.c')
@@ -305,14 +268,43 @@ if target != 'library'
   endif
 endif
 
-# WolfCrypt sources
+public_key_sources = []
+# Add keystore sources based on signing configuration
+if sign != 'NONE'
+  if get_option('flash_otp_keystore')
+    public_key_sources += ['src/flash_otp_keystore.c']
+  else
+    # Create a dummy keystore.c if it doesn't exist (will be replaced by build tools)
+    if not fs.exists('src/keystore.c')
+      # Create a placeholder keystore file
+      keystore_placeholder = custom_target(
+        'keystore_placeholder',
+        output: 'keystore_placeholder.c',
+        command: [find_program('sh'), '-c', 'echo "// Placeholder keystore" > @OUTPUT@']
+      )
+      public_key_sources += [keystore_placeholder]
+    else
+      public_key_sources += ['src/keystore.c']
+    endif
+  endif
+else
+  # For SIGN=NONE, create an empty keystore
+  keystore_none = custom_target(
+    'keystore_none',
+    output: 'keystore_none.c',
+    command: [find_program('sh'), '-c', 'echo "// SIGN=NONE" > @OUTPUT@']
+  )
+  public_key_sources += [keystore_none]
+endif
+
+# Base WolfCrypt sources (matching arch.mk defaults)
 wolfcrypt_sources = [
   'lib/wolfssl/wolfcrypt/src/sha256.c',
   'lib/wolfssl/wolfcrypt/src/hash.c',
   'lib/wolfssl/wolfcrypt/src/memory.c',
   'lib/wolfssl/wolfcrypt/src/wc_port.c',
   'lib/wolfssl/wolfcrypt/src/wolfmath.c',
-  'lib/wolfssl/wolfcrypt/src/asn.c',
+  'lib/wolfssl/wolfcrypt/src/asn.c',  # From options.mk
 ]
 
 # Math library sources
@@ -325,7 +317,7 @@ else
   ]
 endif
 
-# Signature algorithm specific sources
+# Signature algorithm specific sources (matching options.mk)
 if sign == 'ECC256' or sign == 'ECC384' or sign == 'ECC521'
   wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/ecc.c']
 elif sign == 'ED25519'
@@ -342,8 +334,11 @@ elif sign == 'ED448'
     'lib/wolfssl/wolfcrypt/src/ge_448.c',
     'lib/wolfssl/wolfcrypt/src/fe_448.c',
     'lib/wolfssl/wolfcrypt/src/fe_low_mem.c',
-    'lib/wolfssl/wolfcrypt/src/sha3.c',
   ]
+  # ED448 adds SHA3 if HASH is not already SHA3 (from options.mk)
+  if hash != 'SHA3'
+    wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/sha3.c']
+  endif
 elif sign.startswith('RSA')
   wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/rsa.c']
 elif sign == 'LMS'
@@ -357,10 +352,11 @@ elif sign == 'XMSS'
     'lib/wolfssl/wolfcrypt/src/wc_xmss_impl.c',
   ]
 elif sign == 'ML_DSA'
-  wolfcrypt_sources += [
-    'lib/wolfssl/wolfcrypt/src/dilithium.c',
-    'lib/wolfssl/wolfcrypt/src/sha3.c',
-  ]
+  wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/dilithium.c']
+  # ML_DSA adds SHA3 if HASH is not already SHA3 (from options.mk)
+  if hash != 'SHA3'
+    wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/sha3.c']
+  endif
 endif
 
 # Hash algorithm specific sources
@@ -406,7 +402,7 @@ if tpm_enabled
 
   # Add wolfTPM sources if available
   if fs.exists('lib/wolfTPM')
-    inc_dirs = include_directories(inc_dirs, 'lib/wolfTPM')
+    inc_dirs += include_directories('lib/wolfTPM')
     wolfboot_sources += [
       'lib/wolfTPM/src/tpm2.c',
       'lib/wolfTPM/src/tpm2_packet.c',
@@ -480,18 +476,8 @@ if get_option('flash_otp_keystore') and build_keytools
   )
 endif
 
-keystore_source = []
-# Add keystore sources based on signing configuration
-if sign != 'NONE'
-  if get_option('flash_otp_keystore')
-    keystore_source += ['src/flash_otp_keystore.c']
-  else
-    keystore_source += ['src/keystore.c']
-  endif
-endif
-
 # All sources combined
-all_sources = wolfboot_sources + wolfcrypt_sources
+all_sources = wolfboot_sources + wolfcrypt_sources + public_key_sources
 
 # Main wolfboot library
 libwolfboot = static_library(
@@ -569,7 +555,7 @@ if target != 'library'
 
   wolfboot_exe = executable(
     'wolfboot',
-    [all_sources, keystore_source],
+    all_sources,
     include_directories: [inc_dirs, build_inc_dirs],
     c_args: c_args,
     link_args: link_args,
