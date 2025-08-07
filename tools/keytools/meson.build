@@ -97,6 +97,7 @@ wolfssl_sources = files(
   '../../lib/wolfssl/wolfcrypt/src/sha512.c',
   '../../lib/wolfssl/wolfcrypt/src/sp_c32.c',
   '../../lib/wolfssl/wolfcrypt/src/sp_c64.c',
+  '../../lib/wolfssl/wolfcrypt/src/sp_cortexm.c',
   '../../lib/wolfssl/wolfcrypt/src/sp_int.c',
   '../../lib/wolfssl/wolfcrypt/src/tfm.c',
   # LMS support

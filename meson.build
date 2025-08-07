@@ -79,8 +79,19 @@ if arch == 'ARM'
   c_args += ['-DARCH_ARM']
 elif arch == 'AARCH64'
   c_args += ['-DARCH_AARCH64']
+  # Add AArch64 boot sources
+  if target != 'library'
+    wolfboot_sources += ['src/boot_aarch64.c', 'src/boot_aarch64_start.S']
+  endif
 elif arch == 'x86_64'
   c_args += ['-DARCH_x86_64', '-DFAST_MEMCPY']
+  # Add x86_64 EFI boot source for EFI targets
+  if target == 'x86_64_efi'
+    wolfboot_sources += ['src/boot_x86_64.c']
+    if debug
+      c_args += ['-DWOLFBOOT_DEBUG_EFI=1']
+    endif
+  endif
 elif arch == 'PPC'
   c_args += ['-DARCH_PPC']
 elif arch == 'RISCV'
@@ -106,6 +117,23 @@ elif sign == 'RSA4096'
   c_args += ['-DWOLFBOOT_SIGN_RSA4096']
 elif sign == 'LMS'
   c_args += ['-DWOLFBOOT_SIGN_LMS']
+  # LMS configuration flags matching options.mk
+  lms_levels = get_option('lms_levels')
+  lms_height = get_option('lms_height')  
+  lms_winternitz = get_option('lms_winternitz')
+  
+  c_args += [
+    '-DWOLFSSL_HAVE_LMS',
+    '-DWOLFSSL_WC_LMS', 
+    '-DWOLFSSL_WC_LMS_SMALL',
+    '-DWOLFSSL_LMS_MAX_LEVELS=@0@'.format(lms_levels),
+    '-DWOLFSSL_LMS_MAX_HEIGHT=@0@'.format(lms_height),
+    '-DLMS_LEVELS=@0@'.format(lms_levels),
+    '-DLMS_HEIGHT=@0@'.format(lms_height),
+    '-DLMS_WINTERNITZ=@0@'.format(lms_winternitz),
+    '-DLMS_IMAGE_SIGNATURE_SIZE=@0@'.format(get_option('image_signature_size')),
+    '-DWOLFSSL_LMS_VERIFY_ONLY'
+  ]
 elif sign == 'XMSS'
   c_args += ['-DWOLFBOOT_SIGN_XMSS']
 elif sign == 'ML_DSA'
@@ -133,6 +161,12 @@ if encrypt
   elif get_option('encrypt_with_aes256')
     c_args += ['-DENCRYPT_WITH_AES256', '-DWOLFSSL_AES_256']
   endif
+  
+  # Encryption cache support
+  encrypt_cache = get_option('encrypt_cache')
+  if encrypt_cache > 0
+    c_args += ['-DWOLFBOOT_ENCRYPT_CACHE=@0@'.format(encrypt_cache)]
+  endif
 endif
 
 # Feature flags
@@ -152,6 +186,10 @@ if get_option('wolfboot_tpm_keystore')
   c_args += ['-DWOLFBOOT_TPM_KEYSTORE']
 endif
 
+if get_option('wolfboot_tpm_seal')
+  c_args += ['-DWOLFBOOT_TPM_SEAL']
+endif
+
 if get_option('ext_flash')
   c_args += ['-DEXT_FLASH=1', '-DPART_UPDATE_EXT=1']
 endif
@@ -162,6 +200,10 @@ endif
 
 if get_option('qspi_flash')
   c_args += ['-DQSPI_FLASH=1']
+endif
+
+if get_option('octospi_flash')
+  c_args += ['-DOCTOSPI_FLASH=1', '-DQSPI_FLASH=1']
 endif
 
 if get_option('ram_code')
@@ -178,6 +220,18 @@ endif
 
 if get_option('disable_backup')
   c_args += ['-DDISABLE_BACKUP']
+endif
+
+if get_option('debug_uart')
+  c_args += ['-DDEBUG_UART']
+endif
+
+if get_option('big_endian')
+  c_args += ['-DBIG_ENDIAN_ORDER']
+endif
+
+if get_option('wolfboot_small_stack')
+  c_args += ['-DWOLFBOOT_SMALL_STACK', '-DXMALLOC_USER']
 endif
 
 c_args += ['-DCLOCK_SPEED=@0@'.format(get_option('clock_speed'))]
@@ -280,7 +334,10 @@ if sign != 'NONE'
       keystore_placeholder = custom_target(
         'keystore_placeholder',
         output: 'keystore_placeholder.c',
-        command: [find_program('sh'), '-c', 'echo "// Placeholder keystore" > @OUTPUT@']
+        command: [
+          find_program('sh'),
+          '-c', 'echo "// Placeholder keystore" > @OUTPUT@',
+        ],
       )
       public_key_sources += [keystore_placeholder]
     else
@@ -292,7 +349,7 @@ else
   keystore_none = custom_target(
     'keystore_none',
     output: 'keystore_none.c',
-    command: [find_program('sh'), '-c', 'echo "// SIGN=NONE" > @OUTPUT@']
+    command: [find_program('sh'), '-c', 'echo "// SIGN=NONE" > @OUTPUT@'],
   )
   public_key_sources += [keystore_none]
 endif
@@ -304,12 +361,56 @@ wolfcrypt_sources = [
   'lib/wolfssl/wolfcrypt/src/memory.c',
   'lib/wolfssl/wolfcrypt/src/wc_port.c',
   'lib/wolfssl/wolfcrypt/src/wolfmath.c',
-  'lib/wolfssl/wolfcrypt/src/asn.c',  # From options.mk
+  'lib/wolfssl/wolfcrypt/src/asn.c', # From options.mk
+  'lib/wolfssl/wolfcrypt/src/logging.c', # Debug logging support from arch.mk
 ]
 
 # Math library sources
 if get_option('spmath')
   wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/sp_int.c']
+  
+  # Add Cortex-M optimized SP math if building for ARM Cortex-M and assembly is enabled
+  # Only include when actually cross-compiling for ARM (not on native x86_64)
+  if arch == 'ARM' and not get_option('no_asm') and not get_option('no_arm_asm') and meson.is_cross_build()
+    cortex_m_targets = (
+      get_option('cortex_m0') or 
+      get_option('cortex_m3') or 
+      get_option('cortex_m33') or 
+      get_option('cortex_m7')
+    )
+    if cortex_m_targets
+      wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/sp_cortexm.c']
+      # Add corresponding compiler flags
+      c_args += ['-DWOLFSSL_SP_ASM', '-DWOLFSSL_SP_ARM_CORTEX_M_ASM']
+      if get_option('cortex_m7')
+        c_args += ['-DWOLFSSL_ARM_ARCH=7']
+      elif get_option('cortex_m3')
+        c_args += ['-DWOLFSSL_SP_NO_UMAAL', '-DWOLFSSL_ARM_ARCH=7']
+      endif
+    else
+      # Default to C implementation for other ARM targets
+      wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/sp_c32.c']
+    endif
+  else
+    # Use C implementation when assembly is disabled or not cross-compiling
+    if arch == 'ARM' or arch == 'AARCH64'
+      wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/sp_c32.c']
+    elif arch == 'x86_64'
+      # x86_64 specific SP math handling
+      if get_option('no_asm') or get_option('force_32bit')
+        if get_option('force_32bit')
+          wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/sp_c32.c']
+          c_args += ['-DWOLFSSL_SP_DIV_WORD_HALF']
+        else
+          wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/sp_c64.c']
+        endif
+      else
+        wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/sp_x86_64.c']
+      endif
+    else
+      wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/sp_c64.c']
+    endif
+  endif
 else
   wolfcrypt_sources += [
     'lib/wolfssl/wolfcrypt/src/integer.c',
@@ -386,6 +487,7 @@ endif
 
 if get_option('uart_flash')
   wolfboot_sources += ['src/uart_flash.c']
+  c_args += ['-DUART_FLASH=1']
 endif
 
 # TPM sources
@@ -561,6 +663,7 @@ if target != 'library'
     link_args: link_args,
     install: false,
     name_suffix: 'elf',
+    build_by_default: meson.is_subproject() == false,
   )
 
 endif
