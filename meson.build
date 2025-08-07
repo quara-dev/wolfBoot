@@ -83,17 +83,12 @@ if arch == 'ARM'
   endif
 elif arch == 'AARCH64'
   c_args += ['-DARCH_AARCH64']
-  # Add AArch64 boot sources
-  if target != 'library'
-    wolfboot_sources += ['src/boot_aarch64.c', 'src/boot_aarch64_start.S']
-  endif
   # Add additional AARCH64 flags from CMakeLists.txt
   c_args += ['-DNO_QNX', '-DWOLFBOOT_DUALBOOT', '-DMMU']
 elif arch == 'x86_64'
   c_args += ['-DARCH_x86_64', '-DFAST_MEMCPY']
-  # Add x86_64 EFI boot source for EFI targets
+  # Add x86_64 EFI target flag
   if target == 'x86_64_efi'
-    wolfboot_sources += ['src/boot_x86_64.c']
     c_args += ['-DTARGET_X86_64_EFI']
     if debug
       c_args += ['-DWOLFBOOT_DEBUG_EFI=1']
@@ -437,6 +432,19 @@ wolfboot_sources = [
   'hal/hal.c',
 ]
 
+# Update sources (matching CMakeLists.txt logic)
+update_sources = []
+if target == 'x86_64_efi'
+  # x86_64_efi uses update_ram.c
+  update_sources += ['src/update_ram.c']
+else
+  # Default for most targets is update_flash.c
+  update_sources += ['src/update_flash.c']
+endif
+
+# Add update sources to main wolfboot sources
+wolfboot_sources += update_sources
+
 # Add xmalloc.c when small stack is enabled (matching CMakeLists.txt)
 if get_option('wolfboot_small_stack')
   wolfboot_sources += ['src/xmalloc.c']
@@ -445,6 +453,15 @@ endif
 # Add loader if not disabled
 if not get_option('no_loader')
   wolfboot_sources += ['src/loader.c']
+endif
+
+# Add architecture-specific sources (matching CMakeLists.txt)
+if arch == 'AARCH64' and target != 'library'
+  # AArch64 has additional boot sources including update_ram.c
+  wolfboot_sources += ['src/boot_aarch64.c', 'src/boot_aarch64_start.S', 'src/update_ram.c']
+elif arch == 'x86_64' and target == 'x86_64_efi'
+  # x86_64 EFI has boot source
+  wolfboot_sources += ['src/boot_x86_64.c']
 endif
 
 # Add target-specific HAL
@@ -533,13 +550,8 @@ if get_option('spmath')
       wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/sp_c32.c']
     elif arch == 'x86_64'
       # x86_64 specific SP math handling
-      if get_option('no_asm') or get_option('force_32bit')
-        if get_option('force_32bit')
-          wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/sp_c32.c']
-          c_args += ['-DWOLFSSL_SP_DIV_WORD_HALF']
-        else
-          wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/sp_c64.c']
-        endif
+      if get_option('no_asm')
+        wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/sp_c64.c']
       else
         wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/sp_x86_64.c']
       endif
