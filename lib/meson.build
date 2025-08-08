@@ -17,21 +17,21 @@ wolfcrypt_sources = [
   'wolfssl/wolfcrypt/src/wc_port.c',
   'wolfssl/wolfcrypt/src/wolfmath.c',
   'wolfssl/wolfcrypt/src/asn.c', # From options.mk
-  'wolfssl/wolfcrypt/src/logging.c', # Debug logging support from arch.mk
+  # 'wolfssl/wolfcrypt/src/logging.c', # Debug logging support from arch.mk
 ]
 
 # Math library sources
 if get_option('spmath')
   wolfcrypt_sources += ['wolfssl/wolfcrypt/src/sp_int.c']
-  
+
   # Add Cortex-M optimized SP math if building for ARM Cortex-M and assembly is enabled
   # Only include when actually cross-compiling for ARM (not on native x86_64)
   if arch == 'ARM' and not get_option('no_asm') and not get_option('no_arm_asm') and meson.is_cross_build()
     cortex_m_targets = (
-      get_option('cortex_m0') or 
-      get_option('cortex_m3') or 
-      get_option('cortex_m33') or 
-      get_option('cortex_m7')
+      get_option('cortex_m0')
+      or get_option('cortex_m3')
+      or get_option('cortex_m33')
+      or get_option('cortex_m7')
     )
     if cortex_m_targets
       wolfcrypt_sources += ['wolfssl/wolfcrypt/src/sp_cortexm.c']
@@ -146,14 +146,9 @@ if tpm_enabled
 endif
 
 # Get compiler args and include dirs from parent
-wolfcrypt_c_args = []
-wolfcrypt_inc_dirs = []
+wolfcrypt_c_args = c_args  # Use parent's c_args
+wolfcrypt_inc_dirs = inc_dirs  # Use parent's inc_dirs
 wolfcrypt_build_inc_dirs = []
-
-# These will be passed from parent
-# wolfcrypt_c_args = get_variable('c_args', [])
-# wolfcrypt_inc_dirs = get_variable('inc_dirs', [])
-# wolfcrypt_build_inc_dirs = get_variable('build_inc_dirs', [])
 
 # WolfSSL include directory
 wolfssl_inc = include_directories('wolfssl')
@@ -178,9 +173,9 @@ if tpm_enabled and fs.exists('wolfTPM') and not meson.is_subproject()
     'wolfTPM/src/tpm2_wrap.c',
     'wolfTPM/src/tpm2_param_enc.c',
   ]
-  
+
   wolftpm_inc = include_directories('wolfTPM')
-  
+
   libwolftpm = static_library(
     'wolftpm',
     wolftpm_sources,
