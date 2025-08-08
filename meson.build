@@ -424,14 +424,6 @@ inc_dirs = [
 # Additional build directory for generated files
 build_inc_dirs = include_directories(['.'], is_system: false)
 
-# Core wolfboot sources
-wolfboot_sources = [
-  'src/string.c',
-  'src/image.c',
-  'src/libwolfboot.c',
-  'hal/hal.c',
-]
-
 # Update sources (matching CMakeLists.txt logic)
 update_sources = []
 if target == 'x86_64_efi'
@@ -440,42 +432,6 @@ if target == 'x86_64_efi'
 else
   # Default for most targets is update_flash.c
   update_sources += ['src/update_flash.c']
-endif
-
-# Add update sources to main wolfboot sources
-wolfboot_sources += update_sources
-
-# Add xmalloc.c when small stack is enabled (matching CMakeLists.txt)
-if get_option('wolfboot_small_stack')
-  wolfboot_sources += ['src/xmalloc.c']
-endif
-
-# Add loader if not disabled
-if not get_option('no_loader')
-  wolfboot_sources += ['src/loader.c']
-endif
-
-# Add architecture-specific sources (matching CMakeLists.txt)
-if arch == 'ARM' and target != 'library'
-  # ARM has boot source
-  wolfboot_sources += ['src/boot_arm.c']
-elif arch == 'AARCH64' and target != 'library'
-  # AArch64 has additional boot sources including update_ram.c
-  wolfboot_sources += ['src/boot_aarch64.c', 'src/boot_aarch64_start.S', 'src/update_ram.c']
-elif arch == 'x86_64' and target == 'x86_64_efi'
-  # x86_64 EFI has boot source
-  wolfboot_sources += ['src/boot_x86_64.c']
-endif
-
-# Add target-specific HAL
-if target != 'library'
-  hal_file = 'hal/@0@.c'.format(target)
-  if fs.exists(hal_file)
-    wolfboot_sources += [hal_file]
-  else
-    warning('HAL file @0@ not found, using skeleton HAL'.format(hal_file))
-    wolfboot_sources += ['hal/skeleton.c']
-  endif
 endif
 
 public_key_sources = []
@@ -577,7 +533,6 @@ endif
 # Delta update sources - always define for tools, conditionally include in main build
 wolfboot_delta_sources = ['../../src/delta.c'] # Path relative to tools directory
 if get_option('delta_updates')
-  wolfboot_sources += ['src/delta.c']
   c_args += ['-DDELTA_UPDATES']
 
   # Add delta block size if defined
@@ -586,9 +541,6 @@ if get_option('delta_updates')
     c_args += ['-DDELTA_BLOCK_SIZE=@0@'.format(delta_block_size)]
   endif
 endif
-
-# Add flash driver sources to main wolfboot sources
-wolfboot_sources += flash_driver_sources
 
 # Subprojects - Build tools separately like Makefile
 # Only build keytools and bin-assemble when explicitly requested
@@ -699,7 +651,7 @@ if sign != 'NONE' and not meson.is_subproject()
 endif
 
 # 5. Main wolfboot library (core sources that link everything together)
-core_wolfboot_sources = [
+wolfboot_sources = [
   'src/string.c',
   'src/image.c',
   'src/libwolfboot.c',
@@ -707,30 +659,30 @@ core_wolfboot_sources = [
 
 # Add additional sources based on configuration
 if get_option('wolfboot_small_stack')
-  core_wolfboot_sources += ['src/xmalloc.c']
+  wolfboot_sources += ['src/xmalloc.c']
 endif
 
 if not get_option('no_loader')
-  core_wolfboot_sources += ['src/loader.c']
+  wolfboot_sources += ['src/loader.c']
 endif
 
 # Add architecture-specific boot sources
 if arch == 'ARM' and target != 'library'
-  core_wolfboot_sources += ['src/boot_arm.c']
+  wolfboot_sources += ['src/boot_arm.c']
 elif arch == 'AARCH64' and target != 'library'
-  core_wolfboot_sources += ['src/boot_aarch64.c', 'src/boot_aarch64_start.S']
+  wolfboot_sources += ['src/boot_aarch64.c', 'src/boot_aarch64_start.S']
 elif arch == 'x86_64' and target == 'x86_64_efi'
-  core_wolfboot_sources += ['src/boot_x86_64.c']
+  wolfboot_sources += ['src/boot_x86_64.c']
 endif
 
 # Add TPM sources if enabled
 if tpm_enabled
-  core_wolfboot_sources += ['src/tpm.c']
+  wolfboot_sources += ['src/tpm.c']
 endif
 
 # Add delta update sources if enabled
 if get_option('delta_updates')
-  core_wolfboot_sources += ['src/delta.c']
+  wolfboot_sources += ['src/delta.c']
 endif
 
 # Link libraries list
@@ -747,7 +699,7 @@ endif
 
 libwolfboot = static_library(
   'wolfboot',
-  core_wolfboot_sources,
+  wolfboot_sources,
   include_directories: [inc_dirs, build_inc_dirs],
   c_args: c_args + ['-Wno-unused'],
   link_with: link_libraries,
@@ -876,7 +828,7 @@ if target != 'library' and not meson.is_subproject()
   wolfboot_exe = executable(
     'wolfboot',
     # Only include the main source files, libraries are linked separately
-    core_wolfboot_sources,
+    wolfboot_sources,
     include_directories: [inc_dirs, build_inc_dirs],
     c_args: c_args,
     link_args: link_args,
@@ -934,30 +886,3 @@ Or build directly with:
   )
 endif
 
-# Documentation for subproject usage
-if meson.is_subproject()
-  message(
-    '''
-SUBPROJECT VARIABLES AVAILABLE:
-
-Individual Libraries:
-- wolfboot_libwolfcrypt     : WolfSSL cryptographic library
-- wolfboot_libwolfboot      : Main wolfBoot library  
-- wolfboot_libwolfboothal   : Hardware abstraction layer
-- wolfboot_libpublic_key    : Public key handling (if signing enabled)
-- wolfboot_libwolftpm       : TPM support (if TPM enabled)
-
-Dependencies:
-- wolfboot_dep              : Main dependency (wolfcrypt + wolfboot)
-- wolfboot_wolfcrypt_dep    : WolfSSL crypto only
-- wolfboot_hal_dep          : HAL only
-- wolfboot_pubkey_dep       : Public key only (if available)
-- wolfboot_tpm_dep          : TPM only (if available)
-
-Usage in parent project:
-  wolfboot_proj = subproject('wolfboot')
-  wolfboot_dep = wolfboot_proj.get_variable('wolfboot_dep')
-  wolfcrypt_lib = wolfboot_proj.get_variable('wolfboot_libwolfcrypt')
-  ''',
-  )
-endif
