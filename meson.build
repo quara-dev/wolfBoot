@@ -756,13 +756,51 @@ libwolfboot = static_library(
 
 # Create dependency for other projects (needed by subprojects)
 if meson.is_subproject()
-  # For subprojects, only expose libwolfcrypt and libwolfboot
+  # For subprojects, expose individual libraries as variables
   subproject_link_libraries = [libwolfcrypt, libwolfboot]
+  
+  # Make individual libraries available to parent projects
+  wolfboot_libwolfcrypt = libwolfcrypt
+  wolfboot_libwolfboot = libwolfboot
+  wolfboot_libwolfboothal = libwolfboothal
+  wolfboot_libpublic_key = libpublic_key
+  wolfboot_libwolftpm = libwolftpm
+  
+  # Main dependency with core libraries
   wolfboot_dep = declare_dependency(
     include_directories: inc_dirs,
     link_with: subproject_link_libraries,
     compile_args: c_args,
   )
+  
+  # Additional dependencies for individual libraries
+  wolfboot_wolfcrypt_dep = declare_dependency(
+    include_directories: inc_dirs,
+    link_with: [libwolfcrypt],
+    compile_args: c_args,
+  )
+  
+  wolfboot_hal_dep = declare_dependency(
+    include_directories: inc_dirs,
+    link_with: [libwolfboothal],
+    compile_args: c_args,
+  )
+  
+  if sign != 'NONE'
+    wolfboot_pubkey_dep = declare_dependency(
+      include_directories: inc_dirs,
+      link_with: [libpublic_key],
+      compile_args: c_args,
+    )
+  endif
+  
+  if tpm_enabled and fs.exists('lib/wolfTPM')
+    wolfboot_tpm_dep = declare_dependency(
+      include_directories: inc_dirs,
+      link_with: [libwolftpm],
+      compile_args: c_args,
+    )
+  endif
 else
   # For standalone builds, expose all libraries
   wolfboot_dep = declare_dependency(
@@ -892,6 +930,34 @@ To build keytools separately (matching Makefile behavior), use:
 Or build directly with:
   meson setup builddir -Dbuild_keytools=true
   meson compile -C builddir keytools
+  ''',
+  )
+endif
+
+# Documentation for subproject usage
+if meson.is_subproject()
+  message(
+    '''
+SUBPROJECT VARIABLES AVAILABLE:
+
+Individual Libraries:
+- wolfboot_libwolfcrypt     : WolfSSL cryptographic library
+- wolfboot_libwolfboot      : Main wolfBoot library  
+- wolfboot_libwolfboothal   : Hardware abstraction layer
+- wolfboot_libpublic_key    : Public key handling (if signing enabled)
+- wolfboot_libwolftpm       : TPM support (if TPM enabled)
+
+Dependencies:
+- wolfboot_dep              : Main dependency (wolfcrypt + wolfboot)
+- wolfboot_wolfcrypt_dep    : WolfSSL crypto only
+- wolfboot_hal_dep          : HAL only
+- wolfboot_pubkey_dep       : Public key only (if available)
+- wolfboot_tpm_dep          : TPM only (if available)
+
+Usage in parent project:
+  wolfboot_proj = subproject('wolfboot')
+  wolfboot_dep = wolfboot_proj.get_variable('wolfboot_dep')
+  wolfcrypt_lib = wolfboot_proj.get_variable('wolfboot_libwolfcrypt')
   ''',
   )
 endif
