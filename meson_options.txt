@@ -14,7 +14,7 @@ option(
 option(
   'target',
   type: 'string',
-  value: 'stm32h7',
+  value: 'library',
   description: 'Target platform (e.g., stm32f4, stm32f7, nrf52, etc.)',
 )
 

@@ -1,11 +1,14 @@
 project(
   'wolfboot',
-  'c',
+  ['c', 'cpp'],
   version: '2.5.0',
   license: 'GPL-2.0+',
-  meson_version: '>=0.61.0',
+  meson_version: '>=1.3.0',
   default_options: {
     'c_std': 'gnu11',
+    'build.c_std': 'gnu11',
+    'cpp_std': 'c++17',
+    'build.cpp_std': 'c++17',
     'warning_level': '2',
     'buildtype': 'release',
     'wrap_mode': 'nodownload',
@@ -41,7 +44,9 @@ warning_flags = [
   '-Wextra',
   '-Werror',
   '-Wno-array-bounds',
-  '-Wno-error=unused-parameter',
+  '-Wno-unused-parameter',
+  '-Wno-pointer-to-int-cast',
+  '-Wno-int-to-pointer-cast',
 ]
 
 foreach flag : warning_flags
@@ -109,7 +114,7 @@ c_args += ['-DARCH_FLASH_OFFSET=@0@'.format(arch_flash_offset)]
 
 # Signing algorithm flags with stack usage and image header size (matching CMakeLists.txt)
 image_header_size = get_option('image_header_size')
-stack_usage = 1216  # Default value
+stack_usage = 1216 # Default value
 
 if sign == 'ECC256'
   c_args += ['-DWOLFBOOT_SIGN_ECC256']
@@ -201,12 +206,12 @@ elif sign == 'LMS'
   c_args += ['-DWOLFBOOT_SIGN_LMS']
   # LMS configuration flags matching options.mk
   lms_levels = get_option('lms_levels')
-  lms_height = get_option('lms_height')  
+  lms_height = get_option('lms_height')
   lms_winternitz = get_option('lms_winternitz')
-  
+
   c_args += [
     '-DWOLFSSL_HAVE_LMS',
-    '-DWOLFSSL_WC_LMS', 
+    '-DWOLFSSL_WC_LMS',
     '-DWOLFSSL_WC_LMS_SMALL',
     '-DWOLFSSL_LMS_MAX_LEVELS=@0@'.format(lms_levels),
     '-DWOLFSSL_LMS_MAX_HEIGHT=@0@'.format(lms_height),
@@ -214,7 +219,7 @@ elif sign == 'LMS'
     '-DLMS_HEIGHT=@0@'.format(lms_height),
     '-DLMS_WINTERNITZ=@0@'.format(lms_winternitz),
     '-DLMS_IMAGE_SIGNATURE_SIZE=@0@'.format(get_option('image_signature_size')),
-    '-DWOLFSSL_LMS_VERIFY_ONLY'
+    '-DWOLFSSL_LMS_VERIFY_ONLY',
   ]
 elif sign == 'XMSS'
   c_args += ['-DWOLFBOOT_SIGN_XMSS']
@@ -262,7 +267,7 @@ if encrypt
     # Default to ChaCha if no specific AES mode is selected (like CMakeLists.txt)
     c_args += ['-DENCRYPT_WITH_CHACHA', '-DHAVE_CHACHA']
   endif
-  
+
   # Encryption cache support
   encrypt_cache = get_option('encrypt_cache')
   if encrypt_cache > 0
@@ -513,11 +518,11 @@ flash_driver_sources = []
 
 # Set EXT_FLASH based on flash drivers (like CMakeLists.txt)
 ext_flash_enabled = (
-  get_option('spi_flash') or 
-  get_option('qspi_flash') or 
-  get_option('octospi_flash') or
-  get_option('uart_flash') or
-  get_option('ext_flash')
+  get_option('spi_flash')
+  or get_option('qspi_flash')
+  or get_option('octospi_flash')
+  or get_option('uart_flash')
+  or get_option('ext_flash')
 )
 
 if ext_flash_enabled
@@ -570,11 +575,11 @@ if tpm_enabled
 endif
 
 # Delta update sources - always define for tools, conditionally include in main build
-wolfboot_delta_sources = ['../../src/delta.c']  # Path relative to tools directory
+wolfboot_delta_sources = ['../../src/delta.c'] # Path relative to tools directory
 if get_option('delta_updates')
   wolfboot_sources += ['src/delta.c']
   c_args += ['-DDELTA_UPDATES']
-  
+
   # Add delta block size if defined
   delta_block_size = get_option('delta_block_size')
   if delta_block_size > 0
@@ -650,7 +655,7 @@ if tpm_enabled and fs.exists('lib/wolfTPM') and not meson.is_subproject()
     'lib/wolfTPM/src/tpm2_wrap.c',
     'lib/wolfTPM/src/tpm2_param_enc.c',
   ]
-  
+
   libwolftpm = static_library(
     'wolftpm',
     wolftpm_sources,
@@ -823,7 +828,7 @@ if target != 'library' and not meson.is_subproject()
       '-ffreestanding',
       '-nostartfiles',
     ]
-    
+
     # Add ARM-specific linker flags (matching CMakeLists.txt)
     if arch == 'ARM'
       link_args += ['-fomit-frame-pointer']
