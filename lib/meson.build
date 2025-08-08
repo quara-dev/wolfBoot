@@ -148,6 +148,25 @@ endif
 # Get compiler args and include dirs from parent
 wolfcrypt_c_args = c_args  # Use parent's c_args
 wolfcrypt_inc_dirs = inc_dirs  # Use parent's inc_dirs
+
+# Add ARM Cortex-M assembly optimization flags (matching CMakeLists.txt behavior)
+if arch == 'ARM' and meson.is_cross_build()
+  cortex_m_targets = (
+    get_option('cortex_m0')
+    or get_option('cortex_m3')
+    or get_option('cortex_m33')
+    or get_option('cortex_m7')
+  )
+  if cortex_m_targets and not get_option('no_asm') and not get_option('no_arm_asm')
+    wolfcrypt_c_args += ['-DWOLFSSL_SP_ASM', '-DWOLFSSL_SP_ARM_CORTEX_M_ASM']
+    if get_option('cortex_m7')
+      wolfcrypt_c_args += ['-DWOLFSSL_ARM_ARCH=7']
+    elif get_option('cortex_m3')
+      wolfcrypt_c_args += ['-DWOLFSSL_SP_NO_UMAAL', '-DWOLFSSL_ARM_ARCH=7']
+    endif
+  endif
+endif
+
 wolfcrypt_build_inc_dirs = []
 
 # WolfSSL include directory
