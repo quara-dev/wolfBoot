@@ -718,6 +718,13 @@ if meson.is_subproject()
   wolfboot_libpublic_key = libpublic_key
   wolfboot_libwolftpm = libwolftpm
   
+  # Make keytools executables available to parent projects
+  if build_keytools and keytools_target.length() > 0
+    wolfboot_keygen = keytools_target[0]  # keygen executable
+    wolfboot_sign_tool = keytools_target[1]  # sign executable
+    wolfboot_keytools = keytools_target  # both tools as array
+  endif
+  
   # Main dependency with core libraries
   wolfboot_dep = declare_dependency(
     include_directories: inc_dirs,
@@ -882,6 +889,40 @@ To build keytools separately (matching Makefile behavior), use:
 Or build directly with:
   meson setup builddir -Dbuild_keytools=true
   meson compile -C builddir keytools
+  ''',
+  )
+endif
+
+# Documentation for subproject usage
+if meson.is_subproject()
+  message(
+    '''
+SUBPROJECT VARIABLES AVAILABLE:
+
+Individual Libraries:
+- wolfboot_libwolfcrypt     : WolfSSL cryptographic library
+- wolfboot_libwolfboot      : Main wolfBoot library  
+- wolfboot_libwolfboothal   : Hardware abstraction layer
+- wolfboot_libpublic_key    : Public key handling (if signing enabled)
+- wolfboot_libwolftpm       : TPM support (if TPM enabled)
+
+Keytools Executables (if build_keytools=true):
+- wolfboot_keygen           : Key generation executable
+- wolfboot_sign_tool        : Firmware signing executable
+- wolfboot_keytools         : Both tools as array [keygen, sign_tool]
+
+Dependencies:
+- wolfboot_dep              : Main dependency (wolfcrypt + wolfboot)
+- wolfboot_wolfcrypt_dep    : WolfSSL crypto only
+- wolfboot_hal_dep          : HAL only
+- wolfboot_pubkey_dep       : Public key only (if available)
+- wolfboot_tpm_dep          : TPM only (if available)
+
+Usage in parent project:
+  wolfboot_proj = subproject('wolfboot', default_options: ['build_keytools=true'])
+  wolfboot_dep = wolfboot_proj.get_variable('wolfboot_dep')
+  keygen_tool = wolfboot_proj.get_variable('wolfboot_keygen')
+  sign_tool = wolfboot_proj.get_variable('wolfboot_sign_tool')
   ''',
   )
 endif
