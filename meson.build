@@ -830,9 +830,9 @@ if target != 'library' and not meson.is_subproject()
     if arch == 'ARM'
       link_args += ['-fomit-frame-pointer']
       # Add embedded-optimized specs for smaller binary size
-      if meson.is_cross_build()
-        link_args += ['--specs=nano.specs', '--specs=nosys.specs']
-      endif
+      # if meson.is_cross_build()
+      #   link_args += ['--specs=nano.specs', '--specs=nosys.specs']
+      # endif
     endif
   endif
 
