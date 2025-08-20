@@ -829,6 +829,10 @@ if target != 'library' and not meson.is_subproject()
     # Add ARM-specific linker flags (matching CMakeLists.txt)
     if arch == 'ARM'
       link_args += ['-fomit-frame-pointer']
+      # Add embedded-optimized specs for smaller binary size
+      if meson.is_cross_build()
+        link_args += ['--specs=nano.specs', '--specs=nosys.specs']
+      endif
     endif
   endif
 
