@@ -697,6 +697,8 @@ if not meson.is_subproject()
   endif
 endif
 
+c_args += ['--specs=nano.specs', '--specs=nosys.specs']
+
 libwolfboot = static_library(
   'wolfboot',
   wolfboot_sources,
