@@ -646,10 +646,11 @@ if external_keystore_configured and keytools_target.length() > 0
     keygen_sign_flag = '--rsa4096'
   endif
   
+  external_key = meson.current_source_dir() +'/' + external_public_key
   # Generate keystore.c from external public key
   external_keystore = custom_target(
     'external_keystore',
-    input: [external_public_key],
+    input: [external_key],
     output: ['keystore.c'],
     command: [
       keygen_exe,
