@@ -30,6 +30,21 @@ sign = get_option('sign')
 hash = get_option('hash')
 encrypt = get_option('encrypt')
 debug = get_option('wolfboot_debug')
+build_keytools = get_option('build_keytools')
+build_bin_assemble = get_option('build_bin_assemble')
+external_public_key = get_option('external_public_key')
+
+# Helper function to get keygen flag from signing algorithm
+keygen_flags = {
+  'ECC256': '--ecc256',
+  'ECC384': '--ecc384',
+  'ECC521': '--ecc521',
+  'ED25519': '--ed25519',
+  'ED448': '--ed448',
+  'RSA2048': '--rsa2048',
+  'RSA3072': '--rsa3072',
+  'RSA4096': '--rsa4096',
+}
 
 # Base compiler flags
 c_args = [
@@ -433,46 +448,25 @@ else
   # Default for most targets is update_flash.c
   update_sources += ['src/update_flash.c']
 endif
-# Subprojects - Build tools separately like Makefile
-# Only build keytools and bin-assemble when explicitly requested
-build_keytools = get_option('build_keytools')
-build_bin_assemble = get_option('build_bin_assemble')
+
+# Initialize keystore sources
 public_key_sources = []
+
 # Add keystore sources based on signing configuration
 if sign != 'NONE'
   if get_option('flash_otp_keystore')
     public_key_sources += ['src/flash_otp_keystore.c']
   else
-    external_public_key = get_option('external_public_key')
-    
     # Check if external public key is provided and keytools are built
     if external_public_key != '' and build_keytools
-
-     external_key = meson.current_source_dir() +'/' + external_public_key
+      external_key = meson.current_source_dir() + '/' + external_public_key
       # Ensure the external public key file exists
       if not fs.exists(external_key)
         error('External public key file not found: @0@'.format(external_key))
       endif
       
-      # Determine signing algorithm flag for keygen
-      keygen_sign_flag = '--ecc256'  # default
-      if sign == 'ECC256'
-        keygen_sign_flag = '--ecc256'
-      elif sign == 'ECC384'
-        keygen_sign_flag = '--ecc384'
-      elif sign == 'ECC521'
-        keygen_sign_flag = '--ecc521'
-      elif sign == 'ED25519'
-        keygen_sign_flag = '--ed25519'
-      elif sign == 'ED448'
-        keygen_sign_flag = '--ed448'
-      elif sign == 'RSA2048'
-        keygen_sign_flag = '--rsa2048'
-      elif sign == 'RSA3072'
-        keygen_sign_flag = '--rsa3072'
-      elif sign == 'RSA4096'
-        keygen_sign_flag = '--rsa4096'
-      endif
+      # Get keygen flag for the signing algorithm
+      keygen_sign_flag = keygen_flags.get(sign, '--ecc256')
       
       # Wait for keytools to be built first by making this depend on the keytools
       # We need to defer this until after keytools are defined
@@ -584,8 +578,7 @@ if get_option('delta_updates')
   endif
 endif
 
-
-
+# Subprojects - Build tools separately like Makefile
 # Create separate targets for tools (like Makefile)
 keytools_target = []
 bin_assemble_target = []
@@ -623,32 +616,13 @@ keytools_custom = custom_target(
 
 # Generate external keystore if external public key is provided
 if external_keystore_configured and keytools_target.length() > 0
-  external_public_key = get_option('external_public_key')
-  
   # Get the keygen executable
   keygen_exe = keytools_target[0]  # keygen is first in the array
   
-  # Determine signing algorithm flag for keygen
-  keygen_sign_flag = '--ecc256'  # default
-  if sign == 'ECC256'
-    keygen_sign_flag = '--ecc256'
-  elif sign == 'ECC384'
-    keygen_sign_flag = '--ecc384'
-  elif sign == 'ECC521'
-    keygen_sign_flag = '--ecc521'
-  elif sign == 'ED25519'
-    keygen_sign_flag = '--ed25519'
-  elif sign == 'ED448'
-    keygen_sign_flag = '--ed448'
-  elif sign == 'RSA2048'
-    keygen_sign_flag = '--rsa2048'
-  elif sign == 'RSA3072'
-    keygen_sign_flag = '--rsa3072'
-  elif sign == 'RSA4096'
-    keygen_sign_flag = '--rsa4096'
-  endif
+  # Get keygen flag for the signing algorithm
+  keygen_sign_flag = keygen_flags.get(sign, '--ecc256')
   
-  external_key = meson.current_source_dir() +'/' + external_public_key
+  external_key = meson.current_source_dir() + '/' + external_public_key
   # Generate keystore.c from external public key
   external_keystore = custom_target(
     'external_keystore',
@@ -1029,7 +1003,6 @@ Usage in parent project:
 endif
 
 # External public key usage information
-external_public_key = get_option('external_public_key')
 if external_public_key != '' and not build_keytools
   warning(
     '''
