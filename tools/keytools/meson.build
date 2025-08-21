@@ -51,7 +51,7 @@ keytools_cflags += [
 
 # Add IMAGE_HEADER_SIZE (matching CMakeLists.txt and Makefile behavior)
 keytools_cflags += ['-DIMAGE_HEADER_SIZE=@0@'.format(image_header_size)]
-
+message('IMAGE_HEADER_SIZE=@0@'.format(image_header_size))
 # Universal keystore support
 if get_option('wolfboot_universal_keystore')
   keytools_cflags += ['-DWOLFBOOT_UNIVERSAL_KEYSTORE']
