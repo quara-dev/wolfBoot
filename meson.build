@@ -447,8 +447,10 @@ if sign != 'NONE'
     
     # Check if external public key is provided and keytools are built
     if external_public_key != '' and build_keytools
+
+     external_key = meson.current_source_dir() +'/' + external_public_key
       # Ensure the external public key file exists
-      if not fs.exists(external_public_key)
+      if not fs.exists(external_key)
         error('External public key file not found: @0@'.format(external_public_key))
       endif
       
