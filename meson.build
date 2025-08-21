@@ -729,9 +729,9 @@ if not meson.is_subproject()
   )
 endif
 
-# 4. Public key library (keystore sources, only if signing is enabled and not a subproject)
+# 4. Public key library (keystore sources, only if signing is enabled)
 libpublic_key = []
-if sign != 'NONE' and not meson.is_subproject()
+if sign != 'NONE'
   libpublic_key = static_library(
     'public_key',
     public_key_sources,
@@ -778,11 +778,11 @@ endif
 
 # Link libraries list
 link_libraries = [libwolfcrypt]
+if sign != 'NONE'
+  link_libraries += [libpublic_key]
+endif
 if not meson.is_subproject()
   link_libraries += [libwolfboothal]
-  if sign != 'NONE'
-    link_libraries += [libpublic_key]
-  endif
   if tpm_enabled and fs.exists('lib/wolfTPM')
     link_libraries += [libwolftpm]
   endif
@@ -803,6 +803,9 @@ libwolfboot = static_library(
 if meson.is_subproject()
   # For subprojects, expose individual libraries as variables
   subproject_link_libraries = [libwolfcrypt, libwolfboot]
+  if sign != 'NONE'
+    subproject_link_libraries += [libpublic_key]
+  endif
   
   # Make individual libraries available to parent projects
   wolfboot_libwolfcrypt = libwolfcrypt
