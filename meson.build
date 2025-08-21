@@ -433,7 +433,10 @@ else
   # Default for most targets is update_flash.c
   update_sources += ['src/update_flash.c']
 endif
-
+# Subprojects - Build tools separately like Makefile
+# Only build keytools and bin-assemble when explicitly requested
+build_keytools = get_option('build_keytools')
+build_bin_assemble = get_option('build_bin_assemble')
 public_key_sources = []
 # Add keystore sources based on signing configuration
 if sign != 'NONE'
@@ -579,10 +582,7 @@ if get_option('delta_updates')
   endif
 endif
 
-# Subprojects - Build tools separately like Makefile
-# Only build keytools and bin-assemble when explicitly requested
-build_keytools = get_option('build_keytools')
-build_bin_assemble = get_option('build_bin_assemble')
+
 
 # Create separate targets for tools (like Makefile)
 keytools_target = []
