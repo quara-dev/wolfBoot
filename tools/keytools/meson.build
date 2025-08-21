@@ -31,6 +31,9 @@ endif
 ml_dsa_level = get_option('ml_dsa_level')
 keytools_cflags += ['-DML_DSA_LEVEL=@0@'.format(ml_dsa_level)]
 
+# Add IMAGE_HEADER_SIZE (matching CMakeLists.txt and Makefile behavior)
+keytools_cflags += ['-DIMAGE_HEADER_SIZE=@0@'.format(image_header_size)]
+
 # LMS configuration
 lms_levels = get_option('lms_levels')
 lms_height = get_option('lms_height')
@@ -49,8 +52,6 @@ keytools_cflags += [
   '-DWOLFBOOT_XMSS_PARAMS="@0@"'.format(xmss_params)
 ]
 
-# Add IMAGE_HEADER_SIZE (matching CMakeLists.txt and Makefile behavior)
-keytools_cflags += ['-DIMAGE_HEADER_SIZE=@0@'.format(image_header_size)]
 message('IMAGE_HEADER_SIZE(keytools)=@0@'.format(image_header_size))
 # Universal keystore support
 if get_option('wolfboot_universal_keystore')

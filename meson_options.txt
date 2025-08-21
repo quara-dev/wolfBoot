@@ -482,15 +482,15 @@ option(
 )
 
 # LMS (Leighton-Micali Signatures) Configuration
-option('lms_levels', type: 'integer', value: 2, description: 'LMS tree levels')
+option('lms_levels', type: 'integer', value: 1, description: 'LMS tree levels (Makefile default: 1)')
 
 option('lms_height', type: 'integer', value: 10, description: 'LMS tree height')
 
 option(
   'lms_winternitz',
   type: 'integer',
-  value: 4,
-  description: 'LMS Winternitz parameter',
+  value: 8,
+  description: 'LMS Winternitz parameter (Makefile default: 8)',
 )
 
 # XMSS Configuration
