@@ -451,7 +451,7 @@ if sign != 'NONE'
      external_key = meson.current_source_dir() +'/' + external_public_key
       # Ensure the external public key file exists
       if not fs.exists(external_key)
-        error('External public key file not found: @0@'.format(external_public_key))
+        error('External public key file not found: @0@'.format(external_key))
       endif
       
       # Determine signing algorithm flag for keygen
