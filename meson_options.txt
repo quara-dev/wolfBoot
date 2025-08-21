@@ -576,7 +576,7 @@ option(
 option(
   'image_header_size',
   type: 'integer',
-  value: 256,
+  value: 1024,
   description: 'Image header size in bytes',
 )
 
