@@ -440,23 +440,60 @@ if sign != 'NONE'
   if get_option('flash_otp_keystore')
     public_key_sources += ['src/flash_otp_keystore.c']
   else
-    # Create a dummy keystore.c if it doesn't exist (will be replaced by build tools)
-    if not fs.exists('src/keystore.c')
-      # Create a placeholder keystore file
-      keystore_placeholder = custom_target(
-        'keystore_placeholder',
-        output: 'keystore_placeholder.c',
-        command: [
-          find_program('sh'),
-          '-c', 'echo "// Placeholder keystore" > @OUTPUT@',
-        ],
-      )
-      public_key_sources += [keystore_placeholder]
+    external_public_key = get_option('external_public_key')
+    
+    # Check if external public key is provided and keytools are built
+    if external_public_key != '' and build_keytools
+      # Ensure the external public key file exists
+      if not fs.exists(external_public_key)
+        error('External public key file not found: @0@'.format(external_public_key))
+      endif
+      
+      # Determine signing algorithm flag for keygen
+      keygen_sign_flag = '--ecc256'  # default
+      if sign == 'ECC256'
+        keygen_sign_flag = '--ecc256'
+      elif sign == 'ECC384'
+        keygen_sign_flag = '--ecc384'
+      elif sign == 'ECC521'
+        keygen_sign_flag = '--ecc521'
+      elif sign == 'ED25519'
+        keygen_sign_flag = '--ed25519'
+      elif sign == 'ED448'
+        keygen_sign_flag = '--ed448'
+      elif sign == 'RSA2048'
+        keygen_sign_flag = '--rsa2048'
+      elif sign == 'RSA3072'
+        keygen_sign_flag = '--rsa3072'
+      elif sign == 'RSA4096'
+        keygen_sign_flag = '--rsa4096'
+      endif
+      
+      # Wait for keytools to be built first by making this depend on the keytools
+      # We need to defer this until after keytools are defined
+      external_keystore_configured = true
     else
-      public_key_sources += ['src/keystore.c']
+      external_keystore_configured = false
+      
+      # Create a dummy keystore.c if it doesn't exist (will be replaced by build tools)
+      if not fs.exists('src/keystore.c')
+        # Create a placeholder keystore file
+        keystore_placeholder = custom_target(
+          'keystore_placeholder',
+          output: 'keystore_placeholder.c',
+          command: [
+            find_program('sh'),
+            '-c', 'echo "// Placeholder keystore" > @OUTPUT@',
+          ],
+        )
+        public_key_sources += [keystore_placeholder]
+      else
+        public_key_sources += ['src/keystore.c']
+      endif
     endif
   endif
 else
+  external_keystore_configured = false
   # For SIGN=NONE, create an empty keystore
   keystore_none = custom_target(
     'keystore_none',
@@ -581,6 +618,57 @@ keytools_custom = custom_target(
   build_by_default: false,
   console: true,
 )
+
+# Generate external keystore if external public key is provided
+if external_keystore_configured and keytools_target.length() > 0
+  external_public_key = get_option('external_public_key')
+  
+  # Get the keygen executable
+  keygen_exe = keytools_target[0]  # keygen is first in the array
+  
+  # Determine signing algorithm flag for keygen
+  keygen_sign_flag = '--ecc256'  # default
+  if sign == 'ECC256'
+    keygen_sign_flag = '--ecc256'
+  elif sign == 'ECC384'
+    keygen_sign_flag = '--ecc384'
+  elif sign == 'ECC521'
+    keygen_sign_flag = '--ecc521'
+  elif sign == 'ED25519'
+    keygen_sign_flag = '--ed25519'
+  elif sign == 'ED448'
+    keygen_sign_flag = '--ed448'
+  elif sign == 'RSA2048'
+    keygen_sign_flag = '--rsa2048'
+  elif sign == 'RSA3072'
+    keygen_sign_flag = '--rsa3072'
+  elif sign == 'RSA4096'
+    keygen_sign_flag = '--rsa4096'
+  endif
+  
+  # Generate keystore.c from external public key
+  external_keystore = custom_target(
+    'external_keystore',
+    input: [external_public_key],
+    output: ['keystore.c'],
+    command: [
+      keygen_exe,
+      '--force',
+      keygen_sign_flag,
+      '-i', '@INPUT0@',
+      '-keystoreDir', meson.current_build_dir(),
+    ],
+    depends: [keygen_exe],
+    build_by_default: true,
+    console: true,
+  )
+  
+  # Replace the placeholder keystore with the generated one
+  public_key_sources = [external_keystore]
+  
+  message('Using external public key: @0@'.format(external_public_key))
+  message('Generating keystore.c with @0@ algorithm'.format(sign))
+endif
 
 # Add custom target for OTP tools specifically (matching Makefile otp target)
 if get_option('flash_otp_keystore') and build_keytools
@@ -877,6 +965,7 @@ summary(
     'TPM Support': tpm_enabled,
     'Build Keytools': build_keytools,
     'Build bin-assemble': build_bin_assemble,
+    'External Public Key': get_option('external_public_key') != '' ? get_option('external_public_key') : 'None',
     'Is Subproject': meson.is_subproject(),
     'Libraries': libraries_built,
   },
@@ -930,6 +1019,32 @@ Usage in parent project:
   keygen_tool = wolfboot_proj.get_variable('wolfboot_keygen')
   sign_tool = wolfboot_proj.get_variable('wolfboot_sign_tool')
   ''',
+  )
+endif
+
+# External public key usage information
+external_public_key = get_option('external_public_key')
+if external_public_key != '' and not build_keytools
+  warning(
+    '''
+WARNING: External public key specified but keytools are not built.
+To use external public key, enable keytools build:
+  meson configure -Dbuild_keytools=true -Dexternal_public_key=@0@
+
+Or build directly with:
+  meson setup builddir -Dbuild_keytools=true -Dexternal_public_key=@0@
+  '''.format(external_public_key)
+  )
+elif external_public_key != '' and build_keytools
+  message(
+    '''
+External public key configured successfully!
+- Key file: @0@
+- Signing algorithm: @1@
+- Generated keystore.c will be used for signing verification
+
+The keystore.c file will be automatically generated from your public key.
+    '''.format(external_public_key, sign)
   )
 endif
 

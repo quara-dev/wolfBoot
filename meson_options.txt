@@ -899,3 +899,11 @@ option(
   value: true,
   description: 'Build bin-assemble tool separately',
 )
+
+# External Public Key Configuration
+option(
+  'external_public_key',
+  type: 'string',
+  value: '',
+  description: 'Path to external public key file (PEM/DER) to generate keystore.c',
+)
