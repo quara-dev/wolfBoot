@@ -127,6 +127,14 @@ c_args += ['-DTARGET_@0@'.format(target.to_upper())]
 arch_flash_offset = get_option('arch_flash_offset')
 c_args += ['-DARCH_FLASH_OFFSET=@0@'.format(arch_flash_offset)]
 
+# Add WOLFBOOT_ORIGIN handling
+wolfboot_origin = get_option('wolfboot_origin')
+if wolfboot_origin == ''
+  c_args += ['-DWOLFBOOT_ORIGIN=@0@'.format(arch_flash_offset)]
+else
+  c_args += ['-DWOLFBOOT_ORIGIN=@0@'.format(wolfboot_origin)]
+endif
+
 # Signing algorithm flags with stack usage and image header size (matching CMakeLists.txt)
 image_header_size = get_option('image_header_size')
 stack_usage = 1216 # Default value
@@ -312,7 +320,10 @@ if get_option('wolfboot_tpm_seal')
 endif
 
 if get_option('ext_flash')
-  c_args += ['-DEXT_FLASH=1', '-DPART_UPDATE_EXT=1']
+  c_args += ['-DEXT_FLASH=1', '-DPART_UPDATE_EXT=1', '-DPART_SWAP_EXT=1']
+  if get_option('no_xip')
+    c_args += ['-DPART_BOOT_EXT=1']
+  endif
 endif
 
 if get_option('spi_flash')
@@ -343,6 +354,10 @@ if get_option('disable_backup')
   c_args += ['-DDISABLE_BACKUP']
 endif
 
+if get_option('dualbank_swap')
+  c_args += ['-DWOLFBOOT_DUALBOOT', '-DDUALBANK_SWAP=1']
+endif
+
 if get_option('debug_uart')
   c_args += ['-DDEBUG_UART']
 endif
@@ -369,7 +384,7 @@ if get_option('no_mpu')
 endif
 
 if get_option('no_xip')
-  c_args += ['-DWOLFBOOT_NO_XIP']
+  c_args += ['-DWOLFBOOT_NO_XIP', '-DNO_XIP']
 endif
 
 if get_option('armored')
@@ -446,7 +461,11 @@ if target == 'x86_64_efi'
   update_sources += ['src/update_ram.c']
 else
   # Default for most targets is update_flash.c
-  update_sources += ['src/update_flash.c']
+  if get_option('dualbank_swap')
+    update_sources += ['src/update_flash_hwswap.c']
+  else
+    update_sources += ['src/update_flash.c']
+  endif
 endif
 
 # Initialize keystore sources

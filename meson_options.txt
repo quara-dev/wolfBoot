@@ -36,7 +36,7 @@ option(
     'XMSS',
     'ML_DSA',
   ],
-  value: 'ECC256',
+  value: 'NONE',
   description: 'Signature algorithm',
 )
 
@@ -520,35 +520,35 @@ option(
 option(
   'wolfboot_partition_size',
   type: 'string',
-  value: '0x20000',
+  value: '0x60000',
   description: 'Partition size in bytes (hex)',
 )
 
 option(
   'wolfboot_sector_size',
   type: 'string',
-  value: '0x1000',
+  value: '0x20000',
   description: 'Flash sector size in bytes (hex)',
 )
 
 option(
   'wolfboot_partition_boot_address',
   type: 'string',
-  value: '0x20000',
+  value: '0x8020000',
   description: 'Boot partition address (hex)',
 )
 
 option(
   'wolfboot_partition_update_address',
   type: 'string',
-  value: '0x40000',
+  value: '0x080A0000',
   description: 'Update partition address (hex)',
 )
 
 option(
   'wolfboot_partition_swap_address',
   type: 'string',
-  value: '0x60000',
+  value: '0x08080000',
   description: 'Swap partition address (hex)',
 )
 
@@ -741,7 +741,7 @@ option(
 option(
   'flags_home',
   type: 'boolean',
-  value: false,
+  value: true,
   description: 'Enable flags home',
 )
 
