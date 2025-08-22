@@ -339,6 +339,7 @@ libwolfcrypt = static_library(
     include_directories('.'),
     include_directories('../include'),
     include_directories('wolfssl'),
+    include_directories('..', is_system: false),  # Add parent dir for target.h in build
   ],
   c_args: c_args + ['-Wno-unused'],
   install: false,

@@ -322,9 +322,9 @@ wolfcrypt_dep = get_variable('wolfcrypt_dep')
 
 # Create additional include directory for generated headers
 # This allows subprojects to find generated target.h when available
-# Note: target.h is generated in the build directory, so we include that path
+# Note: Using '.' includes both source and build directories automatically
 generated_inc = declare_dependency(
-  include_directories: include_directories(meson.current_build_dir(), is_system: false)
+  include_directories: include_directories('.', is_system: false)
 )
 
 # Core wolfBoot sources
