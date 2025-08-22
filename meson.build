@@ -599,6 +599,7 @@ if need_keygen
             'cp src/keystore.c @0@/@1@'.format(meson.current_build_dir(), '@OUTPUT0@')
           ])
         ],
+        depends: [keygen_exe],
         build_by_default: true,
       )
       
@@ -607,20 +608,34 @@ if need_keygen
       message('Generated keystore.c from external public key: @0@'.format(public_key_path))
     else
       # Generate keystore.c from generated private key (standard workflow)
-      # For now, we'll create a minimal keystore for SIGN=NONE case
-      keystore_c_target = custom_target('keystore_c_empty',
-        output: 'keystore.c',
+      private_key_file = meson.current_build_dir() / 'wolfboot_signing_private_key.der'
+      keystore_c_file = meson.current_build_dir() / 'keystore.c'
+      
+      private_key_target = custom_target('private_key',
+        output: 'wolfboot_signing_private_key.der',
         command: [
-          'echo', 
-          '// SIGN=NONE\n#include "keystore.h"\n#ifdef WOLFBOOT_NO_SIGN\n#define NUM_PUBKEYS 0\nconst struct keystore_slot PubKeys[NUM_PUBKEYS] = { };\nint keystore_num_pubkeys(void) { return 0; }\n#endif'
+          'sh', '-c',
+          '&&'.join([
+            'cd @0@'.format(meson.current_source_dir()),
+            'mkdir -p src',
+            '@0@ --force @1@ -g @2@'.format(keygen_exe.full_path(), keygen_sign_flag, private_key_file),
+            'cp src/keystore.c @0@'.format(keystore_c_file)
+          ])
         ],
-        capture: true,
+        depends: [keygen_exe],
+        build_by_default: true,
+      )
+      
+      keystore_c_target = custom_target('keystore_c',
+        input: private_key_target,
+        output: 'keystore.c',
+        command: ['true'],  # No-op since file is already generated
         build_by_default: true,
       )
       
       # Add generated keystore to sources
       public_key_sources += [keystore_c_target]
-      message('Generated empty keystore.c for sign=@0@'.format(sign))
+      message('Generated keystore.c from generated private key for sign=@0@'.format(sign))
     endif
   else
     error('Unsupported signature algorithm for keystore generation: @0@'.format(sign))
