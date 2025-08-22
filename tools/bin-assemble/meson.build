@@ -1,18 +1,20 @@
-# Binary assembler tool
+# Binary assembly tool for creating combined firmware images
 
-bin_assemble_sources = [
+bin_assemble_exe = executable(
+  'bin-assemble',
   'bin-assemble.c',
-]
-
-bin_assemble = executable('bin-assemble',
-  bin_assemble_sources,
-  include_directories : inc_dirs,
-  c_args: ['-Wall', '-g', '-ggdb'],
-  build_by_default: true,
+  include_directories: [
+    include_directories('../../'),
+    include_directories('../../include'),
+  ],
+  c_args: [
+    '-D__WOLFBOOT',
+    '-Wall',
+    '-Wextra',
+  ],
   native: true,
-  install : false,
+  install: false,
 )
 
-# Export bin-assemble executable for parent scope (matching Makefile behavior)
-bin_assemble_executable = bin_assemble
-set_variable('bin_assemble_executable', bin_assemble_executable)
+# Export program for use by parent build
+meson.override_find_program('bin-assemble', bin_assemble_exe)

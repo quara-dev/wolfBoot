@@ -1,87 +1,42 @@
-# OTP Keystore Tools - Modern Meson 1.3+ Build
+fs = import('fs')
+# OTP keystore tools
 
-# Get variables from parent scope
-build_options = get_variable('build_options', {})
-c_args = get_variable('c_args', [])
-inc_dirs = get_variable('inc_dirs', [])
-wolfboot_dep = get_variable('wolfboot_dep')
+inc = [include_directories('../../..')]
 
-# OTP keystore generator
-otp_keystore_gen_sources = ['otp-keystore-gen.c']
-if fs.exists('common.c')
-  otp_keystore_gen_sources += ['common.c']
-endif
+cflags = ['-Wall', '-Wextra']
 
 otp_keystore_gen = executable('otp-keystore-gen',
-  otp_keystore_gen_sources,
-  include_directories : inc_dirs,
-  c_args : c_args + ['-DOTP_KEYSTORE_GEN'],
-  dependencies : [wolfboot_dep],
-  install : false,
+  ['otp-keystore-gen.c', '../../../src/keystore.c'],
+  include_directories: inc,
+  c_args: cflags + ['-DFLASH_OTP_KEYSTORE'],
+  native: true,
+  install: false,
 )
 
-# OTP keystore primer - requires special handling for embedded targets
-primer_sources = ['otp-keystore-primer.c']
+# Primer (ELF) if sources exist
+primer_srcs = []
+if fs.exists('otp-keystore-primer.c')
+  primer_srcs += ['otp-keystore-primer.c']
+endif
 if fs.exists('startup.c')
-  primer_sources += ['startup.c']
+  primer_srcs += ['startup.c']
 endif
 
-# Check if we need special embedded flags for the primer
-primer_c_args = c_args + ['-DOTP_KEYSTORE_PRIMER']
-primer_link_args = []
+if primer_srcs.length() > 0
+  primer = executable('otp-keystore-primer',
+    primer_srcs,
+    include_directories: inc,
+    c_args: cflags + ['-DOTP_KEYSTORE_PRIMER'],
+    name_suffix: 'elf',
+    install: false,
+  )
 
-# For embedded targets, we may need special linker configuration
-if build_options.get('use_gcc_headless', false)
-  # Look for primer-specific linker script
-  primer_ld = 'otp-keystore-primer.ld'
-  if fs.exists(primer_ld)
-    primer_link_args = ['-T', meson.current_source_dir() / primer_ld]
-    message('Using OTP primer linker script: @0@'.format(primer_ld))
-  endif
-endif
+  objcopy_name = meson.get_external_property('objcopy', get_option('objcopy_prog'))
+  objcopy_prog = find_program(objcopy_name, required: true)
 
-otp_keystore_primer = executable('otp-keystore-primer',
-  primer_sources,
-  include_directories : inc_dirs,
-  c_args : primer_c_args,
-  link_args : primer_link_args,
-  dependencies : [wolfboot_dep],
-  install : false,
-  name_suffix : 'elf',
-)
-
-# Generate binary file from primer ELF
-objcopy = find_program('objcopy', required: true)
-otp_keystore_primer_bin = custom_target('otp-keystore-primer.bin',
-  input : otp_keystore_primer,
-  output : 'otp-keystore-primer.bin',
-  command : [objcopy, '-O', 'binary', '@INPUT@', '@OUTPUT@'],
-  install : false,
-  build_by_default : true,
-)
-
-# Generate hex file as well
-otp_keystore_primer_hex = custom_target('otp-keystore-primer.hex',
-  input : otp_keystore_primer,
-  output : 'otp-keystore-primer.hex',
-  command : [objcopy, '-O', 'ihex', '@INPUT@', '@OUTPUT@'],
-  install : false,
-)
-
-# Export targets for parent scope
-otp_tools = [otp_keystore_gen, otp_keystore_primer]
-otp_binaries = [otp_keystore_primer_bin, otp_keystore_primer_hex]
-
-set_variable('otp_tools', otp_tools)
-set_variable('otp_binaries', otp_binaries)
-
-# Custom target for generating OTP keystore data
-if not meson.is_cross_build()
-  gen_otp_keystore = custom_target('generate-otp-keystore',
-    output : 'otp_keystore.h',
-    command : [otp_keystore_gen, '--output', '@OUTPUT@'],
-    build_by_default : false,
+  custom_target('otp-keystore-primer.bin',
+    input: primer,
+    output: 'otp-keystore-primer.bin',
+    command: [objcopy_prog, '-O', 'binary', '@INPUT@', '@OUTPUT@'],
   )
 endif
-
-message('Built OTP tools: otp-keystore-gen and otp-keystore-primer')
