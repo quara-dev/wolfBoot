@@ -442,33 +442,72 @@ libwolfboothal = static_library(
   install: false,
 )
 
-# Public key sources
+# Public key sources - will be updated after keystore generation if needed
 public_key_sources = []
+
 if sign != 'NONE'
   if get_option('flash_otp_keystore')
     public_key_sources += ['src/flash_otp_keystore.c']
   else
+    # Use existing keystore.c from source (may be overridden by generated version)
     public_key_sources += ['src/keystore.c']
   endif
 endif
 
 # Build public key library
+library_sources = public_key_sources
+if library_sources.length() == 0
+  library_sources = ['src/string.c']  # dummy source if empty
+endif
+
 libpublic_key = static_library(
   'public_key',
-  public_key_sources.length() > 0 ? public_key_sources : ['src/string.c'], # dummy source if empty
+  library_sources,
   include_directories: inc_dirs,
   c_args: c_args,
   install: false,
 )
 
-# Build main wolfboot library
+# Collect flash driver sources for libwolfboot (similar to WOLFBOOT_FLASH_SOURCES in CMake)
+flash_sources = []
+if get_option('spi_flash')
+  flash_sources += ['src/spi_flash.c']
+  spi_target = get_option('spi_target')
+  if fs.exists('hal/spi/spi_drv_@0@.c'.format(spi_target))
+    flash_sources += ['hal/spi/spi_drv_@0@.c'.format(spi_target)]
+  endif
+endif
+
+if get_option('qspi_flash')
+  flash_sources += ['src/qspi_flash.c']
+endif
+
+if get_option('uart_flash')
+  flash_sources += ['src/uart_flash.c']
+  uart_target = get_option('uart_target')
+  if fs.exists('hal/uart/uart_drv_@0@.c'.format(uart_target))
+    flash_sources += ['hal/uart/uart_drv_@0@.c'.format(uart_target)]
+  endif
+endif
+
+# Build libwolfboot static library (matches CMake libwolfboot)
 libwolfboot = static_library(
   'wolfboot',
+  ['src/libwolfboot.c'] + flash_sources,
+  include_directories: inc_dirs,
+  c_args: c_args + ['-Wno-unused'],
+  dependencies: [wolfcrypt_dep],
+  link_with: [libwolfboothal, libpublic_key],
+  install: false,
+)
+
+# Build main wolfboot implementation library
+libwolfboot_main = static_library(
+  'wolfboot_main',
   wolfboot_sources,
   include_directories: inc_dirs,
   c_args: c_args,
   dependencies: [wolfcrypt_dep],
-  link_with: [libwolfboothal, libpublic_key],
   install: false,
 )
 
@@ -537,7 +576,7 @@ if target != 'library'
     include_directories: inc_dirs,
     c_args: c_args,
     link_args: link_args,
-    link_whole: [libwolfboot],
+    link_whole: [libwolfboot_main],
     dependencies: [wolfcrypt_dep],
     link_with: [libwolfboothal, libpublic_key],
     install: false,
@@ -557,7 +596,8 @@ if target != 'library'
 endif
 
 # Build tools if requested
-if get_option('build_keytools')
+need_keygen = get_option('public_key_path') != '' and sign != 'NONE'
+if get_option('build_keytools') or need_keygen
   subdir('tools/keytools')
 endif
 
@@ -565,9 +605,10 @@ if get_option('build_bin_assemble')
   subdir('tools/bin-assemble')
 endif
 
-# Generate keystore.c if public key path is provided
-public_key_path = get_option('public_key_path')
-if public_key_path != '' and sign != 'NONE'
+# Generate keystore.c if public key path is provided and keygen is available
+if need_keygen
+  public_key_path = get_option('public_key_path')
+  
   # Convert sign option to keygen flag
   keygen_sign_flag = ''
   if sign == 'ECC256'
@@ -595,11 +636,8 @@ if public_key_path != '' and sign != 'NONE'
   endif
   
   if keygen_sign_flag != ''
-    # Get keygen executable
-    keygen_exe = find_program('keygen')
-    
     # Generate keystore.c from external public key
-    keystore_c = custom_target('keystore_c',
+    keystore_c_gen = custom_target('keystore_c',
       input: public_key_path,
       output: 'keystore.c',
       command: [
@@ -628,5 +666,67 @@ summary({
   'SP Math All': get_option('spmathall'),
   'SP Math': get_option('spmath'),
 }, section: 'Configuration')
+
+# Declare dependencies for use as subproject
+# This makes all wolfBoot libraries available to parent projects
+wolfboot_dep = declare_dependency(
+  link_with: libwolfboot,
+  include_directories: inc_dirs,
+  compile_args: c_args,
+  dependencies: wolfcrypt_dep,
+)
+
+wolfboot_main_dep = declare_dependency(
+  link_with: [libwolfboot_main, libwolfboothal, libpublic_key],
+  include_directories: inc_dirs,
+  compile_args: c_args,
+  dependencies: wolfcrypt_dep,
+)
+
+wolfboothal_dep = declare_dependency(
+  link_with: libwolfboothal,
+  include_directories: inc_dirs,
+  compile_args: c_args,
+)
+
+wolfboot_public_key_dep = declare_dependency(
+  link_with: libpublic_key,
+  include_directories: inc_dirs,
+  compile_args: c_args,
+)
+
+# Complete wolfboot dependency with all components
+wolfboot_complete_dep = declare_dependency(
+  link_with: [libwolfboot, libwolfboothal, libpublic_key],
+  include_directories: inc_dirs,
+  compile_args: c_args,
+  dependencies: wolfcrypt_dep,
+)
+
+# Make libraries available as variables for direct access
+meson.override_dependency('wolfboot', wolfboot_dep)
+meson.override_dependency('wolfboot-complete', wolfboot_complete_dep)
+meson.override_dependency('wolfboothal', wolfboothal_dep)
+meson.override_dependency('wolfboot-public-key', wolfboot_public_key_dep)
+
+# Also make individual libraries available
+wolfboot_libraries = {
+  'libwolfboot': libwolfboot,
+  'libwolfboot_main': libwolfboot_main,
+  'libwolfboothal': libwolfboothal,
+  'libpublic_key': libpublic_key,
+}
+
+# Export important configuration variables for parent projects
+wolfboot_config = {
+  'arch': arch,
+  'target': target,
+  'sign': sign,
+  'hash_alg': hash_alg,
+  'c_args': c_args,
+  'inc_dirs': inc_dirs,
+  'image_signature_size': image_signature_size,
+  'image_header_size': image_header_size,
+}
 
 message('wolfBoot configured successfully')
