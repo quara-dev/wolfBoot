@@ -14,6 +14,9 @@ project(
   },
 )
 
+# Include cortex CPU detection module
+subdir('meson/cortex_detection')
+
 # Compiler and filesystem helpers
 cc = meson.get_compiler('c')
 fs = import('fs')
@@ -48,6 +51,161 @@ if get_option('wolfboot_small_stack')
   c_args += ['-DWOLFBOOT_SMALL_STACK', '-DXMALLOC_USER']
 endif
 
+# Critical system configuration flags
+if not get_option('vtor')
+  c_args += ['-DNO_VTOR']
+endif
+
+if get_option('no_mpu')
+  c_args += ['-DWOLFBOOT_NO_MPU']
+endif
+
+if get_option('ram_code')
+  c_args += ['-DRAM_CODE']
+endif
+
+if get_option('dualbank_swap')
+  c_args += ['-DDUALBANK_SWAP=1']
+endif
+
+if get_option('allow_downgrade')
+  c_args += ['-DALLOW_DOWNGRADE']
+endif
+
+if get_option('nvm_flash_writeonce')
+  c_args += ['-DNVM_FLASH_WRITEONCE']
+endif
+
+if get_option('disable_backup')
+  c_args += ['-DDISABLE_BACKUP']
+endif
+
+if get_option('flags_home')
+  c_args += ['-DFLAGS_HOME=1']
+endif
+
+if get_option('flags_invert')
+  c_args += ['-DWOLFBOOT_FLAGS_INVERT=1']
+endif
+
+wolfboot_version = get_option('wolfboot_version')
+if wolfboot_version != 0
+  c_args += ['-DWOLFBOOT_VERSION=@0@'.format(wolfboot_version)]
+endif
+
+# ARM TrustZone configuration
+if get_option('tzen')
+  c_args += ['-DTZEN']
+endif
+
+if get_option('wolfcrypt_tz')
+  c_args += ['-DWOLFCRYPT_SECURE_MODE']
+endif
+
+if get_option('wolfcrypt_tz_pkcs11')
+  c_args += ['-DSECURE_PKCS11', '-DWOLFSSL_PKCS11_RW_TOKENS']
+  c_args += ['-DCK_CALLABLE="__attribute__((cmse_nonsecure_entry))"']
+  c_args += ['-DWP11_HASH_PIN_COST=3']
+endif
+
+# Hardware acceleration and platform features
+if get_option('pka')
+  c_args += ['-DPKA=1']
+endif
+
+if get_option('psoc6_crypto')
+  c_args += ['-DPSOC6_CRYPTO=1']
+endif
+
+if get_option('armored')
+  c_args += ['-DWOLFBOOT_ARMORED']
+endif
+
+if get_option('wolfboot_huge_stack')
+  c_args += ['-DWOLFBOOT_HUGE_STACK']
+endif
+
+if get_option('no_xip')
+  c_args += ['-DNO_XIP']
+endif
+
+# Advanced features
+if get_option('elf')
+  c_args += ['-DWOLFBOOT_ELF']
+endif
+
+if get_option('multiboot2')
+  c_args += ['-DWOLFBOOT_MULTIBOOT2']
+endif
+
+if get_option('linux_payload')
+  c_args += ['-DWOLFBOOT_LINUX_PAYLOAD']
+endif
+
+if get_option('64bit')
+  c_args += ['-DWOLFBOOT_64BIT']
+endif
+
+if get_option('wolfboot_universal_keystore')
+  c_args += ['-DWOLFBOOT_UNIVERSAL_KEYSTORE']
+endif
+
+if get_option('disk_lock')
+  c_args += ['-DWOLFBOOT_ATA_DISK_LOCK']
+  disk_lock_password = get_option('disk_lock_password')
+  if disk_lock_password != ''
+    c_args += ['-DWOLFBOOT_ATA_DISK_LOCK_PASSWORD="@0@"'.format(disk_lock_password)]
+  endif
+endif
+
+if get_option('force_32bit')
+  c_args += ['-DFORCE_32BIT']
+endif
+
+if get_option('big_endian')
+  c_args += ['-DBIG_ENDIAN=1']
+endif
+
+if get_option('flash_multi_sector_erase')
+  c_args += ['-DWOLFBOOT_FLASH_MULTI_SECTOR_ERASE']
+endif
+
+# wolfHSM support
+if get_option('wolfhsm_client')
+  c_args += ['-DWOLFHSM_CLIENT=1']
+  if get_option('wolfhsm_client_local_keys')
+    c_args += ['-DWOLFHSM_CLIENT_LOCAL_KEYS=1']
+  endif
+endif
+
+# Secondary signature support
+sign_secondary = get_option('sign_secondary')
+if sign_secondary != ''
+  c_args += ['-DSIGN_HYBRID', '-DWOLFBOOT_SIGN_SECONDARY_@0@'.format(sign_secondary)]
+endif
+
+# LMS/XMSS/ML-DSA parameters
+if sign == 'LMS'
+  lms_levels = get_option('lms_levels')
+  lms_height = get_option('lms_height')
+  lms_winternitz = get_option('lms_winternitz')
+  c_args += [
+    '-DLMS_LEVELS=@0@'.format(lms_levels),
+    '-DLMS_HEIGHT=@0@'.format(lms_height),
+    '-DLMS_WINTERNITZ=@0@'.format(lms_winternitz)
+  ]
+endif
+
+if sign == 'XMSS'
+  xmss_params = get_option('xmss_params')
+  c_args += ['-DWOLFBOOT_XMSS_PARAMS="@0@"'.format(xmss_params)]
+endif
+
+if sign == 'ML_DSA'
+  ml_dsa_level = get_option('ml_dsa_level')
+  c_args += ['-DML_DSA_LEVEL=@0@'.format(ml_dsa_level)]
+endif
+
 # Architecture-specific configuration
 if arch == 'ARM'
   c_args += ['-DARCH_ARM']
@@ -59,6 +217,35 @@ if arch == 'ARM'
       '-fomit-frame-pointer',
     ]
   endif
+  
+  # Use shared Cortex-M CPU detection
+  cortex_cpu = cortex_cpu_detected
+  
+  # Set Cortex-M specific flags based on detected CPU
+  if cortex_cpu.contains('cortex-m0')
+    c_args += ['-DCORTEX_M0']
+    message('Auto-detected Cortex-M0 processor')
+  elif cortex_cpu.contains('cortex-m3')
+    c_args += ['-DCORTEX_M3']
+    message('Auto-detected Cortex-M3 processor')
+  elif cortex_cpu.contains('cortex-m7')
+    c_args += ['-DCORTEX_M7']
+    message('Auto-detected Cortex-M7 processor')
+  elif cortex_cpu.contains('cortex-m33') or cortex_cpu.contains('cortex-m35')
+    c_args += ['-DCORTEX_M33']
+    message('Auto-detected Cortex-M33/M35 processor')
+  elif cortex_cpu.contains('cortex-m4')
+    c_args += ['-DCORTEX_M4']
+    message('Auto-detected Cortex-M4 processor')
+  elif cortex_cpu.contains('cortex-m23')
+    c_args += ['-DCORTEX_M23']
+    message('Auto-detected Cortex-M23 processor')
+  elif cortex_cpu != ''
+    message('Detected ARM CPU: @0@ (no specific Cortex-M optimizations applied)'.format(cortex_cpu))
+  else
+    message('ARM architecture detected but no specific Cortex-M CPU identified')
+  endif
+  
 elif arch == 'AARCH64'
   c_args += ['-DARCH_AARCH64']
 elif arch == 'x86_64'
@@ -146,9 +333,60 @@ if get_option('wolfboot_small_stack')
   wolfboot_sources += ['src/xmalloc.c']
 endif
 
+# Add delta updates support
+if get_option('delta_updates')
+  wolfboot_sources += ['src/delta.c']
+endif
+
+# Add ELF loader support
+if get_option('elf')
+  wolfboot_sources += ['src/elf.c']
+endif
+
+# Add multiboot support
+if get_option('multiboot2')
+  wolfboot_sources += ['src/multiboot.c']
+endif
+
+# Add disk lock support
+if get_option('disk_lock')
+  # Note: This would require additional wolfSSL coding sources
+  # wolfboot_sources += ['lib/wolfssl/wolfcrypt/src/coding.c']
+endif
+
+# Add PKCS11 and TrustZone sources
+if get_option('wolfcrypt_tz_pkcs11')
+  wolfboot_sources += [
+    'src/pkcs11_store.c',
+    'src/pkcs11_callable.c'
+  ]
+endif
+
+# Add TrustZone callable functions
+if get_option('wolfcrypt_tz')
+  wolfboot_sources += ['src/wc_callable.c']
+endif
+
+# Add TPM support sources
+if get_option('wolfboot_tpm_verify') or get_option('measured_boot') or get_option('wolfboot_tpm_keystore') or get_option('wolfboot_tpm_seal')
+  wolfboot_sources += ['src/tpm.c']
+endif
+
 # Add architecture-specific boot file for ARM targets
 if arch in ['ARM', 'ARM_BE'] or target in ['stm32f4', 'stm32f7', 'stm32h7', 'stm32l0', 'stm32l4', 'stm32l5', 'stm32u5', 'stm32h5', 'stm32wb', 'stm32g0', 'stm32c0', 'nrf52', 'nrf5340', 'kinetis', 'mcxa', 'mcxw', 'lpc', 'same51', 'samr21', 'sama5d3', 'pic32c', 'pic32ck', 'pic32cz', 'psoc6']
   wolfboot_sources += ['src/boot_arm.c']
+elif arch == 'AARCH64'
+  wolfboot_sources += ['src/boot_aarch64.c', 'src/boot_aarch64_start.c']
+elif arch == 'x86_64'
+  if target == 'x86_64_efi'
+    wolfboot_sources += ['src/boot_x86_64.c']
+  endif
+elif arch == 'RISCV'
+  wolfboot_sources += ['src/boot_riscv.c']
+elif arch == 'PPC'
+  wolfboot_sources += ['src/boot_ppc.c', 'src/boot_ppc_start.c']
+elif arch == 'RENESAS_RX'
+  wolfboot_sources += ['src/boot_renesas.c', 'src/boot_renesas_start.c']
 endif
 
 # Add loader unless disabled
@@ -162,6 +400,16 @@ hal_sources = ['hal/hal.c']
 # Add target-specific HAL unless building library target
 if target != 'library'
   hal_sources += ['hal/@0@.c'.format(target)]
+endif
+
+# Add TrustZone specific HAL for STM32 targets
+if get_option('tzen') and target.startswith('stm32')
+  hal_sources += ['hal/stm32_tz.c']
+endif
+
+# Add architecture-specific HAL files
+if arch == 'RENESAS_RX'
+  hal_sources += ['hal/renesas-rx.c']
 endif
 
 # Flash driver sources based on options
@@ -315,6 +563,59 @@ endif
 
 if get_option('build_bin_assemble')
   subdir('tools/bin-assemble')
+endif
+
+# Generate keystore.c if public key path is provided
+public_key_path = get_option('public_key_path')
+if public_key_path != '' and sign != 'NONE'
+  # Convert sign option to keygen flag
+  keygen_sign_flag = ''
+  if sign == 'ECC256'
+    keygen_sign_flag = '--ecc256'
+  elif sign == 'ECC384'
+    keygen_sign_flag = '--ecc384'
+  elif sign == 'ECC521'
+    keygen_sign_flag = '--ecc521'
+  elif sign == 'ED25519'
+    keygen_sign_flag = '--ed25519'
+  elif sign == 'ED448'
+    keygen_sign_flag = '--ed448'
+  elif sign == 'RSA2048'
+    keygen_sign_flag = '--rsa2048'
+  elif sign == 'RSA3072'
+    keygen_sign_flag = '--rsa3072'
+  elif sign == 'RSA4096'
+    keygen_sign_flag = '--rsa4096'
+  elif sign == 'LMS'
+    keygen_sign_flag = '--lms'
+  elif sign == 'XMSS'
+    keygen_sign_flag = '--xmss'
+  elif sign == 'ML_DSA'
+    keygen_sign_flag = '--ml-dsa'
+  endif
+  
+  if keygen_sign_flag != ''
+    # Get keygen executable
+    keygen_exe = find_program('keygen')
+    
+    # Generate keystore.c from external public key
+    keystore_c = custom_target('keystore_c',
+      input: public_key_path,
+      output: 'keystore.c',
+      command: [
+        keygen_exe,
+        '--force',
+        keygen_sign_flag,
+        '-i', '@INPUT0@',
+        '-keystoreDir', meson.current_source_dir() / 'src',
+      ],
+      build_by_default: true,
+    )
+    
+    message('Generated keystore.c from external public key: @0@'.format(public_key_path))
+  else
+    error('Unsupported signature algorithm for keystore generation: @0@'.format(sign))
+  endif
 endif
 
 # Summary

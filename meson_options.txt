@@ -45,6 +45,7 @@ option('image_header_size', type: 'integer', value: 256, description: 'Image hea
 option('build_keytools', type: 'boolean', value: true, description: 'Build key generation and signing tools')
 option('build_bin_assemble', type: 'boolean', value: true, description: 'Build binary assembly tool')
 option('objcopy_prog', type: 'string', value: 'objcopy', description: 'objcopy program name')
+option('public_key_path', type: 'string', value: '', description: 'Path to external public key file for keystore generation')
 
 # TPM options
 option('wolfboot_tpm_verify', type: 'boolean', value: false, description: 'Enable TPM signature verification')
@@ -55,3 +56,55 @@ option('wolfboot_tpm_seal', type: 'boolean', value: false, description: 'Enable 
 # Additional configuration
 option('delta_updates', type: 'boolean', value: true, description: 'Enable delta updates')
 option('wolfboot_small_stack', type: 'boolean', value: true, description: 'Use small stack configuration')
+
+# Critical system options
+option('vtor', type: 'boolean', value: true, description: 'Enable Vector Table Offset Register')
+option('no_mpu', type: 'boolean', value: false, description: 'Disable Memory Protection Unit')
+option('ram_code', type: 'boolean', value: false, description: 'Execute code from RAM')
+option('dualbank_swap', type: 'boolean', value: false, description: 'Enable dual bank flash swapping')
+option('allow_downgrade', type: 'boolean', value: false, description: 'Allow firmware version downgrades')
+option('nvm_flash_writeonce', type: 'boolean', value: false, description: 'Flash memory is write-once')
+option('disable_backup', type: 'boolean', value: false, description: 'Disable backup functionality')
+option('flags_home', type: 'boolean', value: false, description: 'Use custom flags location')
+option('flags_invert', type: 'boolean', value: false, description: 'Invert flag logic')
+option('wolfboot_version', type: 'integer', value: 0, description: 'Custom wolfBoot version number')
+
+# ARM TrustZone support
+option('tzen', type: 'boolean', value: false, description: 'Enable ARM TrustZone support')
+option('wolfcrypt_tz', type: 'boolean', value: false, description: 'Enable TrustZone wolfCrypt')
+option('wolfcrypt_tz_pkcs11', type: 'boolean', value: false, description: 'Enable TrustZone PKCS11')
+
+# Hardware acceleration and platform features
+option('pka', type: 'boolean', value: false, description: 'Enable Public Key Acceleration')
+option('psoc6_crypto', type: 'boolean', value: false, description: 'Enable PSoC6 crypto acceleration')
+option('armored', type: 'boolean', value: false, description: 'Enable armored mode')
+option('wolfboot_huge_stack', type: 'boolean', value: false, description: 'Use huge stack configuration')
+option('no_xip', type: 'boolean', value: false, description: 'Disable execute-in-place')
+
+# Advanced features
+option('elf', type: 'boolean', value: false, description: 'Enable ELF loader support')
+option('multiboot2', type: 'boolean', value: false, description: 'Enable Multiboot2 support')
+option('linux_payload', type: 'boolean', value: false, description: 'Enable Linux payload support')
+option('64bit', type: 'boolean', value: false, description: 'Enable 64-bit support')
+option('wolfboot_universal_keystore', type: 'boolean', value: false, description: 'Enable universal keystore')
+option('disk_lock', type: 'boolean', value: false, description: 'Enable ATA disk lock')
+option('disk_lock_password', type: 'string', value: '', description: 'ATA disk lock password')
+
+# System configuration
+option('force_32bit', type: 'boolean', value: false, description: 'Force 32-bit mode')
+option('big_endian', type: 'boolean', value: false, description: 'Enable big endian support')
+option('flash_multi_sector_erase', type: 'boolean', value: false, description: 'Enable multi-sector erase')
+
+# wolfHSM support
+option('wolfhsm_client', type: 'boolean', value: false, description: 'Enable wolfHSM client support')
+option('wolfhsm_client_local_keys', type: 'boolean', value: false, description: 'Enable wolfHSM local keys')
+
+# Additional signature options
+option('sign_secondary', type: 'combo', choices: ['', 'ECC256', 'ECC384', 'ECC521', 'ED25519', 'ED448', 'RSA2048', 'RSA3072', 'RSA4096', 'LMS', 'XMSS', 'ML_DSA'], value: '', description: 'Secondary signature algorithm for hybrid signing')
+
+# LMS/XMSS/ML-DSA parameters
+option('lms_levels', type: 'integer', value: 2, description: 'LMS signature levels')
+option('lms_height', type: 'integer', value: 5, description: 'LMS signature height')
+option('lms_winternitz', type: 'integer', value: 8, description: 'LMS Winternitz parameter')
+option('xmss_params', type: 'string', value: 'XMSS-SHA2_10_256', description: 'XMSS parameters')
+option('ml_dsa_level', type: 'integer', value: 2, description: 'ML-DSA security level')
