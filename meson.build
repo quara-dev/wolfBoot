@@ -43,6 +43,11 @@ c_args = [
   '-Wno-main',
 ]
 
+# Small stack configuration
+if get_option('wolfboot_small_stack')
+  c_args += ['-DWOLFBOOT_SMALL_STACK', '-DXMALLOC_USER']
+endif
+
 # Architecture-specific configuration
 if arch == 'ARM'
   c_args += ['-DARCH_ARM']
@@ -123,105 +128,10 @@ image_header_size = get_option('image_header_size')
 c_args += ['-DIMAGE_HEADER_SIZE=@0@'.format(image_header_size)]
 c_args += ['-DIMAGE_SIGNATURE_SIZE=@0@'.format(image_signature_size)]
 
-# Math library configuration (from arch.mk)
-if get_option('spmathall')
-  c_args += ['-DWOLFSSL_SP_MATH_ALL']
-  math_sources = ['lib/wolfssl/wolfcrypt/src/sp_int.c']
-  if arch == 'ARM' and not get_option('no_asm') and not get_option('no_arm_asm')
-    math_sources += ['lib/wolfssl/wolfcrypt/src/sp_cortexm.c']
-  else
-    math_sources += ['lib/wolfssl/wolfcrypt/src/sp_c32.c']
-  endif
-elif get_option('spmath')
-  # SP Math enabled, but not all
-  math_sources = ['lib/wolfssl/wolfcrypt/src/sp_int.c']
-  if arch == 'ARM' and not get_option('no_asm') and not get_option('no_arm_asm')
-    c_args += ['-DWOLFSSL_SP_ASM', '-DWOLFSSL_SP_ARM_CORTEX_M_ASM']
-    math_sources += ['lib/wolfssl/wolfcrypt/src/sp_cortexm.c']
-  else
-    math_sources += ['lib/wolfssl/wolfcrypt/src/sp_c32.c']
-  endif
-else
-  # Use fastmath
-  c_args += ['-DUSE_FAST_MATH']
-  math_sources = [
-    'lib/wolfssl/wolfcrypt/src/integer.c',
-    'lib/wolfssl/wolfcrypt/src/tfm.c'
-  ]
-endif
-
-# Core wolfCrypt sources (always included)
-wolfcrypt_sources = [
-  'lib/wolfssl/wolfcrypt/src/sha256.c',
-  'lib/wolfssl/wolfcrypt/src/hash.c',
-  'lib/wolfssl/wolfcrypt/src/memory.c',
-  'lib/wolfssl/wolfcrypt/src/wc_port.c',
-  'lib/wolfssl/wolfcrypt/src/wolfmath.c',
-  'lib/wolfssl/wolfcrypt/src/asn.c',
-  'lib/wolfssl/wolfcrypt/src/logging.c',
-] + math_sources
-
-# Add signature-specific crypto sources
-if sign in ['ECC256', 'ECC384', 'ECC521']
-  wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/ecc.c']
-elif sign == 'ED25519'
-  wolfcrypt_sources += [
-    'lib/wolfssl/wolfcrypt/src/sha512.c',
-    'lib/wolfssl/wolfcrypt/src/ed25519.c',
-    'lib/wolfssl/wolfcrypt/src/ge_low_mem.c',
-    'lib/wolfssl/wolfcrypt/src/fe_low_mem.c',
-  ]
-elif sign == 'ED448'
-  wolfcrypt_sources += [
-    'lib/wolfssl/wolfcrypt/src/ed448.c',
-    'lib/wolfssl/wolfcrypt/src/ge_low_mem.c',
-    'lib/wolfssl/wolfcrypt/src/ge_448.c',
-    'lib/wolfssl/wolfcrypt/src/fe_448.c',
-    'lib/wolfssl/wolfcrypt/src/fe_low_mem.c',
-  ]
-  if hash_alg != 'SHA3'
-    wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/sha3.c']
-  endif
-elif sign.startswith('RSA')
-  wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/rsa.c']
-endif
-
-# Add hash-specific sources
-if hash_alg == 'SHA384'
-  wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/sha512.c']
-elif hash_alg == 'SHA3'
-  wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/sha3.c']
-endif
-
-# Add encryption sources if enabled
-if encrypt_enabled
-  if get_option('encrypt_with_aes128') or get_option('encrypt_with_aes256')
-    wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/aes.c']
-    if get_option('encrypt_with_aes128')
-      c_args += ['-DENCRYPT_WITH_AES128', '-DWOLFSSL_AES_128']
-    else
-      c_args += ['-DENCRYPT_WITH_AES256', '-DWOLFSSL_AES_256']
-    endif
-  else
-    # Default to ChaCha20
-    wolfcrypt_sources += ['lib/wolfssl/wolfcrypt/src/chacha.c']
-    c_args += ['-DENCRYPT_WITH_CHACHA']
-  endif
-  
-  encrypt_cache = get_option('encrypt_cache')
-  if encrypt_cache > 0
-    c_args += ['-DENCRYPT_CACHE=@0@'.format(encrypt_cache)]
-  endif
-endif
-
-# Build wolfcrypt library
-libwolfcrypt = static_library(
-  'wolfcrypt',
-  wolfcrypt_sources,
-  include_directories: inc_dirs,
-  c_args: c_args + ['-Wno-unused'],
-  install: false,
-)
+# Build wolfcrypt library from lib subdirectory
+subdir('lib')
+# Get the wolfcrypt dependency from the subdirectory
+wolfcrypt_dep = get_variable('wolfcrypt_dep')
 
 # Core wolfBoot sources
 wolfboot_sources = [
@@ -230,6 +140,11 @@ wolfboot_sources = [
   'src/libwolfboot.c',
   'src/update_flash.c',
 ]
+
+# Add xmalloc if small stack is enabled
+if get_option('wolfboot_small_stack')
+  wolfboot_sources += ['src/xmalloc.c']
+endif
 
 # Add architecture-specific boot file for ARM targets
 if arch in ['ARM', 'ARM_BE'] or target in ['stm32f4', 'stm32f7', 'stm32h7', 'stm32l0', 'stm32l4', 'stm32l5', 'stm32u5', 'stm32h5', 'stm32wb', 'stm32g0', 'stm32c0', 'nrf52', 'nrf5340', 'kinetis', 'mcxa', 'mcxw', 'lpc', 'same51', 'samr21', 'sama5d3', 'pic32c', 'pic32ck', 'pic32cz', 'psoc6']
@@ -304,7 +219,8 @@ libwolfboot = static_library(
   wolfboot_sources,
   include_directories: inc_dirs,
   c_args: c_args,
-  link_with: [libwolfcrypt, libwolfboothal, libpublic_key],
+  dependencies: [wolfcrypt_dep],
+  link_with: [libwolfboothal, libpublic_key],
   install: false,
 )
 
@@ -374,7 +290,8 @@ if target != 'library'
     c_args: c_args,
     link_args: link_args,
     link_whole: [libwolfboot],
-    link_with: [libwolfcrypt, libwolfboothal, libpublic_key],
+    dependencies: [wolfcrypt_dep],
+    link_with: [libwolfboothal, libpublic_key],
     install: false,
   )
 

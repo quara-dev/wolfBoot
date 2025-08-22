@@ -53,5 +53,5 @@ option('wolfboot_tpm_keystore', type: 'boolean', value: false, description: 'Ena
 option('wolfboot_tpm_seal', type: 'boolean', value: false, description: 'Enable TPM sealing')
 
 # Additional configuration
-option('delta_updates', type: 'boolean', value: false, description: 'Enable delta updates')
-option('wolfboot_small_stack', type: 'boolean', value: false, description: 'Use small stack configuration')
+option('delta_updates', type: 'boolean', value: true, description: 'Enable delta updates')
+option('wolfboot_small_stack', type: 'boolean', value: true, description: 'Use small stack configuration')
