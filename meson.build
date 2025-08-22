@@ -97,6 +97,32 @@ endif
 # Architecture-specific flags
 if arch == 'ARM'
   c_args += ['-DARCH_ARM']
+  # Apply Cortex-M tuning like arch.mk
+  if cc.has_argument('-mthumb')
+    c_args += ['-mthumb']
+  endif
+  if cc.has_argument('-mlittle-endian')
+    c_args += ['-mlittle-endian']
+  endif
+  if cc.has_argument('-mthumb-interwork')
+    c_args += ['-mthumb-interwork']
+  endif
+  # CPU
+  cpu_flag = ''
+  if get_option('cortex_m33')
+    cpu_flag = '-mcpu=cortex-m33'
+  elif get_option('cortex_m7')
+    cpu_flag = '-mcpu=cortex-m7'
+  elif get_option('cortex_m3')
+    cpu_flag = '-mcpu=cortex-m3'
+  elif get_option('cortex_m0')
+    cpu_flag = '-mcpu=cortex-m0'
+  else
+    cpu_flag = '-mcpu=cortex-m4'
+  endif
+  if cc.has_argument(cpu_flag)
+    c_args += [cpu_flag]
+  endif
   # Add ARM-specific embedded flags (matching CMakeLists.txt)
   if get_option('use_gcc_headless')
     c_args += ['-ffreestanding', '-nostartfiles', '-fomit-frame-pointer']
@@ -260,6 +286,9 @@ endif
 # Add IMAGE_HEADER_SIZE and stack usage warnings (matching CMakeLists.txt)
 c_args += ['-DIMAGE_HEADER_SIZE=@0@'.format(image_header_size)]
 
+# Also export BOOTLOADER_PARTITION_SIZE like Makefile
+c_args += ['-DBOOTLOADER_PARTITION_SIZE=@0@'.format(get_option('wolfboot_partition_size'))]
+
 # Add stack usage warning if supported by compiler
 if cc.has_argument('-Wstack-usage=@0@'.format(stack_usage))
   c_args += ['-Wstack-usage=@0@'.format(stack_usage)]
@@ -309,14 +338,31 @@ endif
 
 if get_option('measured_boot')
   c_args += ['-DWOLFBOOT_MEASURED_BOOT']
+  # PCR index
+  c_args += ['-DWOLFBOOT_MEASURED_PCR_A=@0@'.format(get_option('measured_pcr_a'))]
 endif
 
 if get_option('wolfboot_tpm_keystore')
   c_args += ['-DWOLFBOOT_TPM_KEYSTORE']
+  if get_option('wolfboot_tpm_keystore_auth') != ''
+    c_args += ['-DWOLFBOOT_TPM_KEYSTORE_AUTH=\"@0@\"'.format(get_option('wolfboot_tpm_keystore_auth'))]
+  endif
+  if get_option('wolfboot_tpm_keystore_nv_base') != ''
+    c_args += ['-DWOLFBOOT_TPM_KEYSTORE_NV_BASE=@0@'.format(get_option('wolfboot_tpm_keystore_nv_base'))]
+  endif
 endif
 
 if get_option('wolfboot_tpm_seal')
   c_args += ['-DWOLFBOOT_TPM_SEAL']
+  if get_option('wolfboot_tpm_seal_auth') != ''
+    c_args += ['-DWOLFBOOT_TPM_SEAL_AUTH=\"@0@\"'.format(get_option('wolfboot_tpm_seal_auth'))]
+  endif
+  if get_option('wolfboot_tpm_seal_nv_base') != ''
+    c_args += ['-DWOLFBOOT_TPM_SEAL_NV_BASE=@0@'.format(get_option('wolfboot_tpm_seal_nv_base'))]
+  endif
+  if get_option('wolfboot_tpm_seal_key_id') != ''
+    c_args += ['-DWOLFBOOT_TPM_SEAL_KEY_ID=@0@'.format(get_option('wolfboot_tpm_seal_key_id'))]
+  endif
 endif
 
 if get_option('ext_flash')
@@ -370,6 +416,51 @@ if get_option('wolfboot_small_stack')
   c_args += ['-DWOLFBOOT_SMALL_STACK', '-DXMALLOC_USER']
 endif
 
+# UART instance macros
+if get_option('use_uart1')
+  c_args += ['-DUSE_UART1=1']
+endif
+if get_option('use_uart3')
+  c_args += ['-DUSE_UART3=1']
+endif
+
+# VTOR control (map vtor=false to NO_VTOR)
+if not get_option('vtor')
+  c_args += ['-DNO_VTOR']
+endif
+
+# Partitions off
+if get_option('wolfboot_no_partitions')
+  c_args += ['-DWOLFBOOT_NO_PARTITIONS']
+endif
+
+# Disk lock support
+if get_option('disk_lock')
+  c_args += ['-DWOLFBOOT_ATA_DISK_LOCK']
+  dl_pass = get_option('disk_lock_password')
+  if dl_pass != ''
+    c_args += ['-DWOLFBOOT_ATA_DISK_LOCK_PASSWORD=\"@0@\"'.format(dl_pass)]
+  endif
+endif
+
+# Flash multi-sector erase
+if get_option('flash_multi_sector_erase')
+  c_args += ['-DWOLFBOOT_FLASH_MULTI_SECTOR_ERASE']
+endif
+
+# KeyVault sizing
+if get_option('keyvault_obj_size') > 0
+  c_args += ['-DKEYVAULT_OBJ_SIZE=@0@'.format(get_option('keyvault_obj_size'))]
+endif
+if get_option('keyvault_max_items') > 0
+  c_args += ['-DKEYVAULT_MAX_ITEMS=@0@'.format(get_option('keyvault_max_items'))]
+endif
+
+# Custom partition ID
+if get_option('wolfboot_part_id') > 0
+  c_args += ['-DHDR_IMG_TYPE_APP=@0@'.format(get_option('wolfboot_part_id'))]
+endif
+
 # Additional options from CMakeLists.txt
 if get_option('flags_home')
   c_args += ['-DFLAGS_HOME=1']
@@ -389,6 +480,37 @@ endif
 
 if get_option('armored')
   c_args += ['-DWOLFBOOT_ARMORED']
+endif
+
+# Misc option-to-macro mappings
+if get_option('no_qnx')
+  c_args += ['-DNO_QNX']
+endif
+if get_option('wolfboot_universal_keystore')
+  c_args += ['-DWOLFBOOT_UNIVERSAL_KEYSTORE']
+endif
+if get_option('linux_payload')
+  c_args += ['-DWOLFBOOT_LINUX_PAYLOAD']
+endif
+if get_option('multiboot2')
+  c_args += ['-DWOLFBOOT_MULTIBOOT2']
+endif
+if get_option('wolfboot_64bit')
+  c_args += ['-DWOLFBOOT_64BIT']
+endif
+if get_option('debug_tpm')
+  c_args += ['-DWOLFBOOT_DEBUG_TPM=1']
+endif
+
+# ELF loader support and options
+if get_option('elf')
+  c_args += ['-DWOLFBOOT_ELF']
+  if get_option('elf_flash_scatter')
+    c_args += ['-DWOLFBOOT_ELF_FLASH_SCATTER=1']
+  endif
+  if get_option('debug_elf') > 0
+    c_args += ['-DDEBUG_ELF=@0@'.format(get_option('debug_elf'))]
+  endif
 endif
 
 # Add WOLFBOOT_VERSION (matching CMakeLists.txt)
@@ -617,8 +739,8 @@ endif
 
 if build_bin_assemble
   subdir('tools/bin-assemble')
-  # Get the bin-assemble tool from the subdirectory
-  bin_assemble_target = get_variable('bin_assemble_executable', [])
+  # Get the bin-assemble tool from the subdirectory (wrap as array)
+  bin_assemble_target = [get_variable('bin_assemble_executable')]
 endif
 
 # Add a custom target for keytools that matches Makefile behavior
@@ -713,6 +835,22 @@ if not meson.is_subproject()
     endif
   endif
 
+  # Add bus drivers used by flash/UART
+  # SPI driver if SPI/QSPI is enabled
+  if (get_option('spi_flash') or get_option('qspi_flash'))
+    spi_drv = 'hal/spi/spi_drv_@0@.c'.format(get_option('spi_target'))
+    if fs.exists(spi_drv)
+      hal_sources += [spi_drv]
+    endif
+  endif
+  # UART driver if UART flash is enabled
+  if get_option('uart_flash')
+    uart_drv = 'hal/uart/uart_drv_@0@.c'.format(get_option('uart_target'))
+    if fs.exists(uart_drv)
+      hal_sources += [uart_drv]
+    endif
+  endif
+
   libwolfboothal = static_library(
     'wolfboothal',
     hal_sources,
@@ -791,6 +929,8 @@ libwolfboot = static_library(
   link_with: link_libraries,
   install: false,
 )
+
+ 
 
 # Create dependency for other projects (needed by subprojects)
 if meson.is_subproject()
@@ -874,7 +1014,9 @@ if target != 'library' and not meson.is_subproject()
 
   # Configuration data for target.h
   linker_conf_data = configuration_data()
-  linker_conf_data.set('WOLFBOOT_PARTITION_SIZE', get_option('wolfboot_sector_size'))
+  linker_conf_data.set('ARCH_FLASH_OFFSET', get_option('arch_flash_offset'))
+  linker_conf_data.set('WOLFBOOT_ORIGIN', get_option('wolfboot_origin'))
+  linker_conf_data.set('WOLFBOOT_PARTITION_SIZE', get_option('wolfboot_partition_size'))
   linker_conf_data.set(
     'WOLFBOOT_PARTITION_BOOT_ADDRESS',
     get_option('wolfboot_partition_boot_address'),
@@ -895,6 +1037,15 @@ if target != 'library' and not meson.is_subproject()
   )
   linker_conf_data.set('WOLFBOOT_LOAD_ADDRESS', get_option('wolfboot_load_address'))
   linker_conf_data.set('WOLFBOOT_LOAD_DTS_ADDRESS', get_option('wolfboot_load_address'))
+  linker_conf_data.set('IMAGE_HEADER_SIZE', image_header_size)
+  # Placeholders for stage1 and other advanced features
+  linker_conf_data.set('WOLFBOOT_STAGE1_SIZE', '0')
+  linker_conf_data.set('WOLFBOOT_STAGE1_LOAD_ADDR', '0')
+  linker_conf_data.set('WOLFBOOT_STAGE1_FLASH_ADDR', '0')
+  linker_conf_data.set('WOLFBOOT_STAGE1_BASE_ADDR', '0')
+  linker_conf_data.set('WOLFBOOT_LOAD_BASE', '0')
+  linker_conf_data.set('BOOTLOADER_START', '0')
+  linker_conf_data.set('FSP_S_LOAD_BASE', '0')
 
   linker_script = configure_file(
     input: 'hal/@0@.ld'.format(target),
@@ -917,7 +1068,27 @@ if target != 'library' and not meson.is_subproject()
 
     # Add ARM-specific linker flags (matching CMakeLists.txt)
     if arch == 'ARM'
-      link_args += ['-fomit-frame-pointer']
+      if cc.has_link_argument('-fomit-frame-pointer')
+        link_args += ['-fomit-frame-pointer']
+      endif
+      if cc.has_link_argument('-mthumb')
+        link_args += ['-mthumb']
+      endif
+      lcpu = ''
+      if get_option('cortex_m33')
+        lcpu = '-mcpu=cortex-m33'
+      elif get_option('cortex_m7')
+        lcpu = '-mcpu=cortex-m7'
+      elif get_option('cortex_m3')
+        lcpu = '-mcpu=cortex-m3'
+      elif get_option('cortex_m0')
+        lcpu = '-mcpu=cortex-m0'
+      else
+        lcpu = '-mcpu=cortex-m4'
+      endif
+      if cc.has_link_argument(lcpu)
+        link_args += [lcpu]
+      endif
       # Add embedded-optimized specs for smaller binary size
       # if meson.is_cross_build()
       #   link_args += ['--specs=nano.specs', '--specs=nosys.specs']
@@ -937,6 +1108,56 @@ if target != 'library' and not meson.is_subproject()
     name_suffix: 'elf',
     build_by_default: meson.is_subproject() == false,
   )
+
+  # Post-build steps (objcopy, etc.)
+  objcopy = find_program('objcopy', required: true)
+
+  # Create wolfboot.bin from wolfboot.elf
+  wolfboot_bin_tgt = custom_target(
+    'wolfboot.bin',
+    input: wolfboot_exe,
+    output: 'wolfboot.bin',
+  command: [objcopy, '--gap-fill', get_option('fill_byte'), '-O', 'binary', '@INPUT@', '@OUTPUT@'],
+    build_by_default: true
+  )
+
+  # Create wolfboot.hex from wolfboot.elf
+  custom_target(
+    'wolfboot.hex',
+    input: wolfboot_exe,
+    output: 'wolfboot.hex',
+    command: [objcopy, '-O', 'ihex', '@INPUT@', '@OUTPUT@'],
+    build_by_default: false, # Match Makefile 'hex' target
+    console: true
+  )
+
+  # Create wolfboot.srec from wolfboot.elf
+  custom_target(
+    'wolfboot.srec',
+    input: wolfboot_exe,
+    output: 'wolfboot.srec',
+    command: [objcopy, '-O', 'srec', '@INPUT@', '@OUTPUT@'],
+    build_by_default: false, # Match Makefile 'srec' target
+    console: true
+  )
+
+  # Handle x86_64_efi target specifically
+  if target == 'x86_64_efi'
+    custom_target(
+      'wolfboot.efi',
+      input: wolfboot_exe,
+      output: 'wolfboot.efi',
+      command: [
+        objcopy,
+        '-j', '.rodata', '-j', '.text', '-j', '.sdata', '-j', '.data',
+        '-j', '.dynamic', '-j', '.dynsym', '-j', '.rel',
+        '-j', '.rela', '-j', '.reloc', '-j', '.eh_frame',
+        '--target=efi-app-x86_64', '--subsystem=10',
+        '@INPUT@', '@OUTPUT@'
+      ],
+      build_by_default: true
+    )
+  endif
 
 endif
 
@@ -1045,4 +1266,15 @@ The keystore.c file will be automatically generated from your public key.
     '''.format(external_public_key, sign)
   )
 endif
+
+if target == 'rp2350'
+  message('To complete the build, check IDE/pico-sdk/rp2350')
+endif
+
+# Include test-app only in non-library mode
+if target != 'library' and not meson.is_subproject()
+  subdir('test-app')
+  subdir('stage1')
+endif
+
 

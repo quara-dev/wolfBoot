@@ -617,6 +617,31 @@ option(
   value: 0,
   description: 'STM32 PLL N multiplier (0 for default)',
 )
+ # Stage1 loader options
+ option(
+   'wolfboot_stage1_size',
+   type: 'string',
+   value: '0x1000',
+   description: 'Stage1 loader size (default 4KB)',
+ )
+ option(
+   'wolfboot_stage1_load_addr',
+   type: 'string',
+   value: '0',
+   description: 'Stage1 RAM load address',
+ )
+ option(
+   'wolfboot_stage1_flash_addr',
+   type: 'string',
+   value: '0',
+   description: 'Stage1 flash address',
+ )
+ option(
+   'wolfboot_stage1_base_addr',
+   type: 'string',
+   value: '0',
+   description: 'Stage1 base address',
+ )
 
 option(
   'stm32_pllp',
@@ -906,4 +931,26 @@ option(
   type: 'string',
   value: '',
   description: 'Path to external public key file (PEM/DER) to generate keystore.c',
+)
+
+# Packaging/signing inputs
+option(
+  'boot_img',
+  type: 'string',
+  value: 'test-app/image.bin',
+  description: 'Path to application image to sign and package',
+)
+
+option(
+  'private_key',
+  type: 'string',
+  value: 'wolfboot_signing_private_key.der',
+  description: 'Primary signing private key (DER)',
+)
+
+option(
+  'secondary_private_key',
+  type: 'string',
+  value: '',
+  description: 'Secondary signing private key for hybrid signing (DER)',
 )

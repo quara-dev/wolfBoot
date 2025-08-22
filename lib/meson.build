@@ -17,7 +17,7 @@ wolfcrypt_sources = [
   'wolfssl/wolfcrypt/src/wc_port.c',
   'wolfssl/wolfcrypt/src/wolfmath.c',
   'wolfssl/wolfcrypt/src/asn.c', # From options.mk
-  # 'wolfssl/wolfcrypt/src/logging.c', # Debug logging support from arch.mk
+  'wolfssl/wolfcrypt/src/logging.c', # Debug logging support from arch.mk
 ]
 
 # Math library sources
@@ -124,6 +124,11 @@ if encrypt
   elif get_option('encrypt_with_aes128') or get_option('encrypt_with_aes256')
     wolfcrypt_sources += ['wolfssl/wolfcrypt/src/aes.c']
   endif
+endif
+
+# Disk lock coding helper
+if get_option('disk_lock')
+  wolfcrypt_sources += ['wolfssl/wolfcrypt/src/coding.c']
 endif
 
 # TPM sources
