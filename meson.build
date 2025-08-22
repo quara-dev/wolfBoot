@@ -586,7 +586,7 @@ if need_keygen
   if keygen_sign_flag != ''
     if public_key_path != ''
       # Generate keystore.c from external public key
-      # Note: keygen tool writes to src/keystore.c by default, so we copy it to build dir
+      # Note: keygen tool writes to src/keystore.c by default, so we move it to build dir
       keystore_c_target = custom_target('keystore_c',
         input: public_key_path,
         output: 'keystore.c',
@@ -596,7 +596,7 @@ if need_keygen
             'cd @0@'.format(meson.current_source_dir()),
             'mkdir -p src',
             '@0@ --force @1@ -i @2@'.format(keygen_exe.full_path(), keygen_sign_flag, public_key_path),
-            'cp src/keystore.c @0@/@1@'.format(meson.current_build_dir(), '@OUTPUT0@')
+            'mv src/keystore.c @0@/@1@'.format(meson.current_build_dir(), '@OUTPUT0@')
           ])
         ],
         depends: [keygen_exe],
@@ -611,25 +611,18 @@ if need_keygen
       private_key_file = meson.current_build_dir() / 'wolfboot_signing_private_key.der'
       keystore_c_file = meson.current_build_dir() / 'keystore.c'
       
-      private_key_target = custom_target('private_key',
-        output: 'wolfboot_signing_private_key.der',
+      keystore_c_target = custom_target('keystore_c',
+        output: ['wolfboot_signing_private_key.der', 'keystore.c'],
         command: [
           'sh', '-c',
           '&&'.join([
             'cd @0@'.format(meson.current_source_dir()),
             'mkdir -p src',
             '@0@ --force @1@ -g @2@'.format(keygen_exe.full_path(), keygen_sign_flag, private_key_file),
-            'cp src/keystore.c @0@'.format(keystore_c_file)
+            'mv src/keystore.c @0@'.format(keystore_c_file)
           ])
         ],
         depends: [keygen_exe],
-        build_by_default: true,
-      )
-      
-      keystore_c_target = custom_target('keystore_c',
-        input: private_key_target,
-        output: 'keystore.c',
-        command: ['true'],  # No-op since file is already generated
         build_by_default: true,
       )
       
