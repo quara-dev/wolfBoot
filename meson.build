@@ -320,6 +320,13 @@ subdir('lib')
 # Get the wolfcrypt dependency from the subdirectory
 wolfcrypt_dep = get_variable('wolfcrypt_dep')
 
+# Create additional include directory for generated headers
+# This allows subprojects to find generated target.h when available
+# Note: The actual target.h will be generated later, but this sets up the include path
+generated_inc = declare_dependency(
+  include_directories: include_directories('.', is_system: false)
+)
+
 # Core wolfBoot sources
 wolfboot_sources = [
   'src/string.c',
@@ -438,7 +445,8 @@ libwolfboothal = static_library(
   'wolfboothal',
   hal_sources,
   include_directories: inc_dirs,
-  c_args: c_args + ['-Wno-unused-parameter', '-Wno-unused-variable'],
+  c_args: c_args,
+  dependencies: generated_inc,  # Include generated headers
   install: false,
 )
 
@@ -630,6 +638,7 @@ libpublic_key = static_library(
   library_sources,
   include_directories: inc_dirs,
   c_args: c_args,
+  dependencies: generated_inc,  # Include generated headers
   install: false,
 )
 
@@ -639,7 +648,7 @@ libwolfboot = static_library(
   ['src/libwolfboot.c'] + flash_sources,
   include_directories: inc_dirs,
   c_args: c_args + ['-Wno-unused'],
-  dependencies: [wolfcrypt_dep],
+  dependencies: [wolfcrypt_dep, generated_inc],  # Include generated headers
   link_with: [libwolfboothal, libpublic_key],
   install: false,
 )
@@ -650,7 +659,7 @@ libwolfboot_main = static_library(
   wolfboot_sources,
   include_directories: inc_dirs,
   c_args: c_args,
-  dependencies: [wolfcrypt_dep],
+  dependencies: [wolfcrypt_dep, generated_inc],  # Include generated headers
   install: false,
 )
 
@@ -663,7 +672,7 @@ if target != 'library'
     c_args: c_args,
     link_args: link_args,
     link_whole: [libwolfboot_main],
-    dependencies: [wolfcrypt_dep],
+    dependencies: [wolfcrypt_dep, generated_inc],  # Include generated headers
     link_with: [libwolfboothal, libpublic_key],
     install: false,
   )
@@ -698,26 +707,28 @@ wolfboot_dep = declare_dependency(
   link_with: libwolfboot,
   include_directories: inc_dirs,
   compile_args: c_args,
-  dependencies: wolfcrypt_dep,
+  dependencies: [wolfcrypt_dep, generated_inc],  # Include generated headers
 )
 
 wolfboot_main_dep = declare_dependency(
   link_with: [libwolfboot_main, libwolfboothal, libpublic_key],
   include_directories: inc_dirs,
   compile_args: c_args,
-  dependencies: wolfcrypt_dep,
+  dependencies: [wolfcrypt_dep, generated_inc],  # Include generated headers
 )
 
 wolfboothal_dep = declare_dependency(
   link_with: libwolfboothal,
   include_directories: inc_dirs,
   compile_args: c_args,
+  dependencies: generated_inc,  # Include generated headers
 )
 
 wolfboot_public_key_dep = declare_dependency(
   link_with: libpublic_key,
   include_directories: inc_dirs,
   compile_args: c_args,
+  dependencies: generated_inc,  # Include generated headers
 )
 
 # Complete wolfboot dependency with all components
@@ -725,7 +736,7 @@ wolfboot_complete_dep = declare_dependency(
   link_with: [libwolfboot, libwolfboothal, libpublic_key],
   include_directories: inc_dirs,
   compile_args: c_args,
-  dependencies: wolfcrypt_dep,
+  dependencies: [wolfcrypt_dep, generated_inc],  # Include generated headers
 )
 
 # Make libraries available as variables for direct access
@@ -752,6 +763,7 @@ wolfboot_config = {
   'inc_dirs': inc_dirs,
   'image_signature_size': image_signature_size,
   'image_header_size': image_header_size,
+  'target_h': target_h,  # Export the generated target.h for subprojects
 }
 
 message('wolfBoot configured successfully')
