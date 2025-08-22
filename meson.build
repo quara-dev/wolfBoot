@@ -322,9 +322,9 @@ wolfcrypt_dep = get_variable('wolfcrypt_dep')
 
 # Create additional include directory for generated headers
 # This allows subprojects to find generated target.h when available
-# Note: The actual target.h will be generated later, but this sets up the include path
+# Note: target.h is generated in the build directory, so we include that path
 generated_inc = declare_dependency(
-  include_directories: include_directories('.', is_system: false)
+  include_directories: include_directories(meson.current_build_dir(), is_system: false)
 )
 
 # Core wolfBoot sources
@@ -693,7 +693,12 @@ if target != 'library'
   )
 
   # Create binary from ELF
-  objcopy_prog = find_program(get_option('objcopy_prog'), required: true)
+  if meson.is_cross_build()
+    # When cross-compiling, use the cross-compiler's objcopy
+    objcopy_prog = find_program('arm-none-eabi-objcopy', required: true)
+  else
+    objcopy_prog = find_program(get_option('objcopy_prog'), required: true)
+  endif
   
   wolfboot_bin = custom_target(
     'wolfboot.bin',

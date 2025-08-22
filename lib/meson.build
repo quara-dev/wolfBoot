@@ -350,6 +350,7 @@ wolfcrypt_dep = declare_dependency(
   include_directories: [
     include_directories('.'),
     include_directories('wolfssl'),
+    include_directories('..', is_system: false),  # Add parent source directory
   ]
 )
 
