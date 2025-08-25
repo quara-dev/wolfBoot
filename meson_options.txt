@@ -22,6 +22,7 @@ option('no_arm_asm', type: 'boolean', value: false, description: 'Disable ARM as
 option('use_gcc_headless', type: 'boolean', value: true, description: 'Use GCC headless/freestanding mode')
 option('no_loader', type: 'boolean', value: false, description: 'Disable bootloader functionality')
 option('wolfboot_debug', type: 'boolean', value: false, description: 'Enable debug mode')
+option('optimization_level', type: 'combo', choices: ['2', '3'], value: '2', description: 'Optimization level (2 for compatibility, 3 for performance)')
 
 # Flash configuration
 option('flash_otp_keystore', type: 'boolean', value: false, description: 'Use OTP flash for keystore')
@@ -39,7 +40,7 @@ option('wolfboot_partition_boot_address', type: 'string', value: '0x8020000', de
 option('wolfboot_partition_update_address', type: 'string', value: '0x80F0000', description: 'Update partition address')
 option('wolfboot_partition_swap_address', type: 'string', value: '0x81C0000', description: 'Swap partition address')
 option('wolfboot_sector_size', type: 'string', value: '0x20000', description: 'Sector size')
-option('image_header_size', type: 'integer', value: 256, description: 'Image header size')
+option('image_header_size', type: 'integer', value: 1024, description: 'Image header size')
 
 # Tool options
 option('build_keytools', type: 'boolean', value: true, description: 'Build key generation and signing tools')

@@ -7,7 +7,7 @@ project(
   default_options: {
     'c_std': 'gnu11',
     'warning_level': '2',
-    'buildtype': 'release',
+    'buildtype': 'debugoptimized',
     'default_library': 'static',
     'b_staticpic': false,
     'b_lto': false,
@@ -45,6 +45,15 @@ c_args = [
   '-Wno-array-bounds',
   '-Wno-main',
 ]
+
+# Optimization level configuration for compatibility
+optimization_level = get_option('optimization_level')
+if optimization_level == '2'
+  # Override default optimization to match parent project builds
+  c_args += ['-O2']
+elif optimization_level == '3'
+  c_args += ['-O3']
+endif
 
 # Small stack configuration
 if get_option('wolfboot_small_stack')
