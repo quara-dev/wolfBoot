@@ -594,6 +594,8 @@ if need_keygen
   
   if keygen_sign_flag != ''
     if public_key_path != ''
+    keystore_c_file = meson.current_build_dir() / 'keystore.c'
+      
       # Generate keystore.c from external public key
       # Note: keygen tool writes to src/keystore.c by default, so we move it to build dir
       keystore_c_target = custom_target('keystore_c',
@@ -605,8 +607,7 @@ if need_keygen
             'cd @0@'.format(meson.current_source_dir()),
             'mkdir -p src',
             '@0@ --force @1@ -i @2@'.format(keygen_exe.full_path(), keygen_sign_flag, public_key_path),
-            'mv src/keystore.c @0@/@1@'.format(meson.current_build_dir(), '@OUTPUT0@')
-          ])
+            'mv src/keystore.c @0@'.format(keystore_c_file)])
         ],
         depends: [keygen_exe],
         build_by_default: true,
