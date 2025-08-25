@@ -7,7 +7,7 @@ project(
   default_options: {
     'c_std': 'gnu11',
     'warning_level': '2',
-    'buildtype': 'debugoptimized',
+    'buildtype': 'debugoptimized',  # Default: -O2 -g for parent project compatibility
     'default_library': 'static',
     'b_staticpic': false,
     'b_lto': false,
@@ -46,13 +46,25 @@ c_args = [
   '-Wno-main',
 ]
 
-# Optimization level configuration for compatibility
-optimization_level = get_option('optimization_level')
-if optimization_level == '2'
-  # Override default optimization to match parent project builds
+# Parent project compatibility mode - override optimization if requested
+# But respect explicit debug buildtype for development
+current_buildtype = get_option('buildtype')
+if get_option('parent_project_compat') and current_buildtype != 'debug'
+  # Force -O2 optimization for parent project compatibility (except in debug mode)
+  # This ensures identical optimization level as parent project builds
   c_args += ['-O2']
-elif optimization_level == '3'
-  c_args += ['-O3']
+  message('Parent project compatibility mode: Using -O2 optimization')
+else
+  # Use Meson's buildtype optimization settings
+  message('Using buildtype optimization: @0@'.format(current_buildtype))
+endif
+
+# wolfBoot debug configuration
+if get_option('wolfboot_debug')
+  c_args += ['-DDEBUG', '-DWOLFBOOT_DEBUG_ENABLED']
+  # Also add as project-wide argument to ensure it gets applied
+  add_project_arguments(['-DDEBUG', '-DWOLFBOOT_DEBUG_ENABLED'], language: 'c')
+  message('wolfBoot debug mode enabled')
 endif
 
 # Small stack configuration

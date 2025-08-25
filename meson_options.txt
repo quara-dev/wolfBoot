@@ -21,8 +21,8 @@ option('no_arm_asm', type: 'boolean', value: false, description: 'Disable ARM as
 # Build options
 option('use_gcc_headless', type: 'boolean', value: true, description: 'Use GCC headless/freestanding mode')
 option('no_loader', type: 'boolean', value: false, description: 'Disable bootloader functionality')
-option('wolfboot_debug', type: 'boolean', value: false, description: 'Enable debug mode')
-option('optimization_level', type: 'combo', choices: ['2', '3'], value: '2', description: 'Optimization level (2 for compatibility, 3 for performance)')
+option('wolfboot_debug', type: 'boolean', value: false, description: 'Enable wolfBoot debug logging and assertions')
+option('parent_project_compat', type: 'boolean', value: true, description: 'Use -O2 optimization for parent project compatibility instead of buildtype default')
 
 # Flash configuration
 option('flash_otp_keystore', type: 'boolean', value: false, description: 'Use OTP flash for keystore')
