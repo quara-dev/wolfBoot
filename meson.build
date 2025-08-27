@@ -65,6 +65,7 @@ if meson.is_subproject()
   c_args += ['-g']
   c_args += ['-Ddebug=true']
   message('Subproject detected: Adding debug symbols (-g)')
+  message('Subproject mode: Skipping HAL files, executables, and flash drivers - exposing only libraries and dependencies')
 endif
 
 # wolfBoot debug configuration
@@ -435,23 +436,23 @@ endif
 # HAL sources
 hal_sources = ['hal/hal.c']
 
-# Add target-specific HAL unless building library target
-if target != 'library'
+# Add target-specific HAL unless building library target or when used as subproject
+if target != 'library' and not meson.is_subproject()
   hal_sources += ['hal/@0@.c'.format(target)]
 endif
 
 # Add TrustZone specific HAL for STM32 targets
-if get_option('tzen') and target.startswith('stm32')
+if get_option('tzen') and target.startswith('stm32') and not meson.is_subproject()
   hal_sources += ['hal/stm32_tz.c']
 endif
 
 # Add architecture-specific HAL files
-if arch == 'RENESAS_RX'
+if arch == 'RENESAS_RX' and not meson.is_subproject()
   hal_sources += ['hal/renesas-rx.c']
 endif
 
 # Flash driver sources based on options
-if get_option('spi_flash')
+if get_option('spi_flash') and not meson.is_subproject()
   hal_sources += ['src/spi_flash.c']
   spi_target = get_option('spi_target')
   if fs.exists('hal/spi/spi_drv_@0@.c'.format(spi_target))
@@ -459,11 +460,11 @@ if get_option('spi_flash')
   endif
 endif
 
-if get_option('qspi_flash')
+if get_option('qspi_flash') and not meson.is_subproject()
   hal_sources += ['src/qspi_flash.c']
 endif
 
-if get_option('uart_flash')
+if get_option('uart_flash') and not meson.is_subproject()
   hal_sources += ['src/uart_flash.c']
   uart_target = get_option('uart_target')
   if fs.exists('hal/uart/uart_drv_@0@.c'.format(uart_target))
@@ -494,8 +495,9 @@ if sign != 'NONE'
 endif
 
 # Collect flash driver sources for libwolfboot (similar to WOLFBOOT_FLASH_SOURCES in CMake)
+# Skip flash drivers when used as subproject unless specifically needed
 flash_sources = []
-if get_option('spi_flash')
+if get_option('spi_flash') and not meson.is_subproject()
   flash_sources += ['src/spi_flash.c']
   spi_target = get_option('spi_target')
   if fs.exists('hal/spi/spi_drv_@0@.c'.format(spi_target))
@@ -503,11 +505,11 @@ if get_option('spi_flash')
   endif
 endif
 
-if get_option('qspi_flash')
+if get_option('qspi_flash') and not meson.is_subproject()
   flash_sources += ['src/qspi_flash.c']
 endif
 
-if get_option('uart_flash')
+if get_option('uart_flash') and not meson.is_subproject()
   flash_sources += ['src/uart_flash.c']
   uart_target = get_option('uart_target')
   if fs.exists('hal/uart/uart_drv_@0@.c'.format(uart_target))
@@ -536,8 +538,8 @@ target_h = configure_file(
   install_dir: get_option('includedir'),
 )
 
-# Generate linker script
-if target != 'library'
+# Generate linker script (unless library target or subproject)
+if target != 'library' and not meson.is_subproject()
   linker_script_input = 'hal/@0@.ld'.format(target)
   if not fs.exists(linker_script_input)
     error('Linker script @0@ not found'.format(linker_script_input))
@@ -570,7 +572,7 @@ if get_option('use_gcc_headless')
   ]
 endif
 
-if target != 'library'
+if target != 'library' and not meson.is_subproject()
   link_args += ['-T', meson.current_build_dir() / 'target.ld']
 endif
 
@@ -580,7 +582,8 @@ if get_option('build_keytools') or need_keygen
   subdir('tools/keytools')
 endif
 
-if get_option('build_bin_assemble')
+# Only build bin-assemble tool when not a subproject or explicitly requested
+if get_option('build_bin_assemble') and not meson.is_subproject()
   subdir('tools/bin-assemble')
 endif
 
@@ -703,8 +706,8 @@ libwolfboot_main = static_library(
   install: false,
 )
 
-# Build main wolfboot executable (unless library target)
-if target != 'library'
+# Build main wolfboot executable (unless library target or subproject)
+if target != 'library' and not meson.is_subproject()
   wolfboot_elf = executable(
     'wolfboot.elf',
     [],  # No additional sources, everything is in the libraries
@@ -744,6 +747,7 @@ summary({
   'Encryption': encrypt_enabled,
   'SP Math All': get_option('spmathall'),
   'SP Math': get_option('spmath'),
+  'Subproject Mode': meson.is_subproject(),
 }, section: 'Configuration')
 
 # Declare dependencies for use as subproject
@@ -811,4 +815,8 @@ wolfboot_config = {
   'target_h': target_h,  # Export the generated target.h for subprojects
 }
 
-message('wolfBoot configured successfully')
+if meson.is_subproject()
+  message('wolfBoot configured successfully as subproject - libraries and dependencies exposed, executables skipped')
+else
+  message('wolfBoot configured successfully')
+endif
