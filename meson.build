@@ -6,9 +6,11 @@ project(
   meson_version: '>=1.3.0',
   default_options: {
     'c_std': 'gnu11',
+    'build.c': 'gnu11',
     'warning_level': '2',
     'buildtype': 'debugoptimized',  # Default: -O2 -g for parent project compatibility
     'default_library': 'static',
+    'b_ndebug': 'if-release',
     'b_staticpic': false,
     'b_lto': false,
   },
@@ -56,6 +58,13 @@ if get_option('parent_project_compat') and current_buildtype != 'debug'
 else
   # Use Meson's buildtype optimization settings
   message('Using buildtype optimization: @0@'.format(current_buildtype))
+endif
+
+# Add debug symbols when built as a subproject (similar to library target in Makefile)
+if meson.is_subproject()
+  c_args += ['-g']
+  c_args += ['-Ddebug=true']
+  message('Subproject detected: Adding debug symbols (-g)')
 endif
 
 # wolfBoot debug configuration
