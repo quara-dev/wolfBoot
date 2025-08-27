@@ -65,7 +65,7 @@ if meson.is_subproject()
   c_args += ['-g']
   c_args += ['-Ddebug=true']
   message('Subproject detected: Adding debug symbols (-g)')
-  message('Subproject mode: Skipping HAL files, executables, and flash drivers - exposing only libraries and dependencies')
+  message('Subproject mode: Skipping HAL files, executables, and flash drivers - exposing libraries, dependencies, and tools')
 endif
 
 # wolfBoot debug configuration
@@ -582,8 +582,8 @@ if get_option('build_keytools') or need_keygen
   subdir('tools/keytools')
 endif
 
-# Only build bin-assemble tool when not a subproject or explicitly requested
-if get_option('build_bin_assemble') and not meson.is_subproject()
+# Build bin-assemble tool - useful for parent projects to assemble firmware images
+if get_option('build_bin_assemble')
   subdir('tools/bin-assemble')
 endif
 
