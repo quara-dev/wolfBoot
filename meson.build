@@ -39,7 +39,6 @@ inc_dirs = [
 c_args = [
   '-D__WOLFBOOT',
   '-DWOLFSSL_USER_SETTINGS',
-  '-DWOLFTPM_USER_SETTINGS',
   '-Wall',
   '-Wextra',
   '-Wno-array-bounds',
@@ -398,6 +397,8 @@ endif
 # Add TPM support sources
 if get_option('wolfboot_tpm_verify') or get_option('measured_boot') or get_option('wolfboot_tpm_keystore') or get_option('wolfboot_tpm_seal')
   wolfboot_sources += ['src/tpm.c']
+  # Add TPM settings only when TPM features are enabled
+  c_args += ['-DWOLFTPM_USER_SETTINGS']
 endif
 
 # Add architecture-specific boot file for ARM targets

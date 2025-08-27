@@ -14,7 +14,6 @@ encrypt_enabled = get_option('encrypt')
 c_args = [
   '-D__WOLFBOOT',
   '-DWOLFSSL_USER_SETTINGS',
-  '-DWOLFTPM_USER_SETTINGS',
   '-Wall',
   '-Wextra',
   '-Wno-array-bounds',
@@ -312,6 +311,8 @@ if get_option('wolfboot_tpm_verify') or get_option('measured_boot') or get_optio
     'wolfssl/wolfcrypt/src/hmac.c',
     'wolfssl/wolfcrypt/src/random.c'
   ]
+  # Add TPM settings only when TPM features are enabled
+  c_args += ['-DWOLFTPM_USER_SETTINGS']
 endif
 
 # Add disk lock sources
