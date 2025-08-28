@@ -472,15 +472,17 @@ if get_option('uart_flash') and not meson.is_subproject()
   endif
 endif
 
-# Build HAL library
-libwolfboothal = static_library(
-  'wolfboothal',
-  hal_sources,
-  include_directories: inc_dirs,
-  c_args: c_args,
-  dependencies: generated_inc,  # Include generated headers
-  install: false,
-)
+# Build HAL library (skip when subproject or library target)
+if target != 'library' and not meson.is_subproject()
+  libwolfboothal = static_library(
+    'wolfboothal',
+    hal_sources,
+    include_directories: inc_dirs,
+    c_args: c_args,
+    dependencies: generated_inc,  # Include generated headers
+    install: false,
+  )
+endif
 
 # Public key sources - will be updated after keystore generation if needed
 public_key_sources = []
@@ -576,18 +578,18 @@ if target != 'library' and not meson.is_subproject()
   link_args += ['-T', meson.current_build_dir() / 'target.ld']
 endif
 
-# Build tools if requested
+# Build tools if requested (include in library mode)
 need_keygen = sign != 'NONE' and get_option('flash_otp_keystore') == false
 if get_option('build_keytools') or need_keygen
   subdir('tools/keytools')
 endif
 
-# Build bin-assemble tool - useful for parent projects to assemble firmware images
+# Build bin-assemble tool - useful for parent projects to assemble firmware images (include in library mode)
 if get_option('build_bin_assemble')
   subdir('tools/bin-assemble')
 endif
 
-# Generate keystore.c 
+# Generate keystore.c (include in library mode for tool availability)
 if need_keygen
   public_key_path = get_option('public_key_path')
   
@@ -670,44 +672,78 @@ if need_keygen
   endif
 endif
 
-# Build public key library after keystore generation
-library_sources = public_key_sources
-if library_sources.length() == 0
-  library_sources = ['src/string.c']  # dummy source if empty
+# Build public key library after keystore generation (skip in library mode)
+if target != 'library'
+  library_sources = public_key_sources
+  if library_sources.length() == 0
+    library_sources = ['src/string.c']  # dummy source if empty
+  endif
+
+  libpublic_key = static_library(
+    'public_key',
+    library_sources,
+    include_directories: inc_dirs,
+    c_args: c_args,
+    dependencies: generated_inc,  # Include generated headers
+    install: false,
+  )
 endif
 
-libpublic_key = static_library(
-  'public_key',
-  library_sources,
-  include_directories: inc_dirs,
-  c_args: c_args,
-  dependencies: generated_inc,  # Include generated headers
-  install: false,
-)
-
 # Build libwolfboot static library (matches CMake libwolfboot)
-libwolfboot = static_library(
-  'wolfboot',
-  ['src/libwolfboot.c'] + flash_sources,
-  include_directories: inc_dirs,
-  c_args: c_args + ['-Wno-unused'],
-  dependencies: [wolfcrypt_dep, generated_inc],  # Include generated headers
-  link_with: [libwolfboothal, libpublic_key],
-  install: false,
-)
+# In library mode, create simple libwolfboot without HAL dependencies
+if target == 'library'
+  libwolfboot = static_library(
+    'wolfboot',
+    ['src/libwolfboot.c'],  # No flash sources in library mode
+    include_directories: inc_dirs,
+    c_args: c_args + ['-Wno-unused'],
+    dependencies: [wolfcrypt_dep, generated_inc],  # Include generated headers
+    install: false,
+  )
+else
+  # Handle conditional linking based on what libraries exist
+  link_libraries = []
+  if target != 'library' and not meson.is_subproject()
+    link_libraries += [libwolfboothal]
+  endif
+  if target != 'library'
+    link_libraries += [libpublic_key]
+  endif
+  
+  libwolfboot = static_library(
+    'wolfboot',
+    ['src/libwolfboot.c'] + flash_sources,
+    include_directories: inc_dirs,
+    c_args: c_args + ['-Wno-unused'],
+    dependencies: [wolfcrypt_dep, generated_inc],  # Include generated headers
+    link_with: link_libraries,
+    install: false,
+  )
+endif
 
-# Build main wolfboot implementation library
-libwolfboot_main = static_library(
-  'wolfboot_main',
-  wolfboot_sources,
-  include_directories: inc_dirs,
-  c_args: c_args,
-  dependencies: [wolfcrypt_dep, generated_inc],  # Include generated headers
-  install: false,
-)
+# Build main wolfboot implementation library (skip in library mode)
+if target != 'library'
+  libwolfboot_main = static_library(
+    'wolfboot_main',
+    wolfboot_sources,
+    include_directories: inc_dirs,
+    c_args: c_args,
+    dependencies: [wolfcrypt_dep, generated_inc],  # Include generated headers
+    install: false,
+  )
+endif
 
 # Build main wolfboot executable (unless library target or subproject)
 if target != 'library' and not meson.is_subproject()
+  # Build executable link libraries list
+  exe_link_libraries = []
+  if target != 'library' and not meson.is_subproject()
+    exe_link_libraries += [libwolfboothal]
+  endif
+  if target != 'library'
+    exe_link_libraries += [libpublic_key]
+  endif
+  
   wolfboot_elf = executable(
     'wolfboot.elf',
     [],  # No additional sources, everything is in the libraries
@@ -716,7 +752,7 @@ if target != 'library' and not meson.is_subproject()
     link_args: link_args,
     link_whole: [libwolfboot_main],
     dependencies: [wolfcrypt_dep, generated_inc],  # Include generated headers
-    link_with: [libwolfboothal, libpublic_key],
+    link_with: exe_link_libraries,
     install: false,
   )
 
@@ -748,6 +784,7 @@ summary({
   'SP Math All': get_option('spmathall'),
   'SP Math': get_option('spmath'),
   'Subproject Mode': meson.is_subproject(),
+  'Library Mode': target == 'library',
 }, section: 'Configuration')
 
 # Declare dependencies for use as subproject
@@ -759,48 +796,95 @@ wolfboot_dep = declare_dependency(
   dependencies: [wolfcrypt_dep, generated_inc],  # Include generated headers
 )
 
-wolfboot_main_dep = declare_dependency(
-  link_with: [libwolfboot_main, libwolfboothal, libpublic_key],
-  include_directories: inc_dirs,
-  compile_args: c_args,
-  dependencies: [wolfcrypt_dep, generated_inc],  # Include generated headers
-)
+# Conditional dependencies based on what was built
+if target != 'library'
+  # Build link libraries list for main dependency
+  main_link_libraries = [libwolfboot_main]
+  if target != 'library' and not meson.is_subproject()
+    main_link_libraries += [libwolfboothal]
+  endif
+  if target != 'library'
+    main_link_libraries += [libpublic_key]
+  endif
+  
+  wolfboot_main_dep = declare_dependency(
+    link_with: main_link_libraries,
+    include_directories: inc_dirs,
+    compile_args: c_args,
+    dependencies: [wolfcrypt_dep, generated_inc],  # Include generated headers
+  )
+  
+  # Build complete dependency link list
+  complete_link_libraries = [libwolfboot]
+  if target != 'library' and not meson.is_subproject()
+    complete_link_libraries += [libwolfboothal]
+  endif
+  if target != 'library'
+    complete_link_libraries += [libpublic_key]
+  endif
+  
+  # Complete wolfboot dependency with all components
+  wolfboot_complete_dep = declare_dependency(
+    link_with: complete_link_libraries,
+    include_directories: inc_dirs,
+    compile_args: c_args,
+    dependencies: [wolfcrypt_dep, generated_inc],  # Include generated headers
+  )
+else
+  # In library mode, only provide basic wolfboot dependency
+  wolfboot_main_dep = wolfboot_dep
+  wolfboot_complete_dep = wolfboot_dep
+endif
 
-wolfboothal_dep = declare_dependency(
-  link_with: libwolfboothal,
-  include_directories: inc_dirs,
-  compile_args: c_args,
-  dependencies: generated_inc,  # Include generated headers
-)
+# HAL dependency (only if HAL was built)
+if target != 'library' and not meson.is_subproject()
+  wolfboothal_dep = declare_dependency(
+    link_with: libwolfboothal,
+    include_directories: inc_dirs,
+    compile_args: c_args,
+    dependencies: generated_inc,  # Include generated headers
+  )
+endif
 
-wolfboot_public_key_dep = declare_dependency(
-  link_with: libpublic_key,
-  include_directories: inc_dirs,
-  compile_args: c_args,
-  dependencies: generated_inc,  # Include generated headers
-)
-
-# Complete wolfboot dependency with all components
-wolfboot_complete_dep = declare_dependency(
-  link_with: [libwolfboot, libwolfboothal, libpublic_key],
-  include_directories: inc_dirs,
-  compile_args: c_args,
-  dependencies: [wolfcrypt_dep, generated_inc],  # Include generated headers
-)
+# Public key dependency (only if public key library was built)
+if target != 'library'
+  wolfboot_public_key_dep = declare_dependency(
+    link_with: libpublic_key,
+    include_directories: inc_dirs,
+    compile_args: c_args,
+    dependencies: generated_inc,  # Include generated headers
+  )
+endif
 
 # Make libraries available as variables for direct access
 meson.override_dependency('wolfboot', wolfboot_dep)
 meson.override_dependency('wolfboot-complete', wolfboot_complete_dep)
-meson.override_dependency('wolfboothal', wolfboothal_dep)
-meson.override_dependency('wolfboot-public-key', wolfboot_public_key_dep)
 
-# Also make individual libraries available
+# Conditional overrides based on what was built
+if target != 'library' and not meson.is_subproject()
+  meson.override_dependency('wolfboothal', wolfboothal_dep)
+endif
+if target != 'library'
+  meson.override_dependency('wolfboot-public-key', wolfboot_public_key_dep)
+endif
+
+# Also make individual libraries available (conditional)
 wolfboot_libraries = {
   'libwolfboot': libwolfboot,
-  'libwolfboot_main': libwolfboot_main,
-  'libwolfboothal': libwolfboothal,
-  'libpublic_key': libpublic_key,
 }
+
+if target != 'library'
+  wolfboot_libraries += {
+    'libwolfboot_main': libwolfboot_main,
+    'libpublic_key': libpublic_key,
+  }
+endif
+
+if target != 'library' and not meson.is_subproject()
+  wolfboot_libraries += {
+    'libwolfboothal': libwolfboothal,
+  }
+endif
 
 # Export important configuration variables for parent projects
 wolfboot_config = {
@@ -817,6 +901,8 @@ wolfboot_config = {
 
 if meson.is_subproject()
   message('wolfBoot configured successfully as subproject - libraries and dependencies exposed, executables skipped')
+elif target == 'library'
+  message('wolfBoot configured successfully in library mode - only libwolfboot static library built')
 else
   message('wolfBoot configured successfully')
 endif
