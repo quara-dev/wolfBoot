@@ -47,14 +47,23 @@ c_args = [
   '-Wno-main',
 ]
 
-# Parent project compatibility mode - override optimization if requested
-# But respect explicit debug buildtype for development
+# Parent project compatibility mode - inherit optimization flags from parent
+# wolfboot_debug option can override to force debug mode regardless of parent settings
 current_buildtype = get_option('buildtype')
-if get_option('parent_project_compat') and current_buildtype != 'debug'
-  # Force -O2 optimization for parent project compatibility (except in debug mode)
-  # This ensures identical optimization level as parent project builds
+wolfboot_debug_enabled = get_option('wolfboot_debug')
+
+if wolfboot_debug_enabled
+  # wolfboot_debug forces debug mode - override any optimization
+  c_args += ['-O0', '-g']
+  message('wolfBoot debug mode enabled: Using -O0 -g (overrides parent project optimization)')
+elif get_option('parent_project_compat') and meson.is_subproject()
+  # When used as subproject, inherit parent's optimization flags
+  # Don't add explicit optimization flags - let parent project control them
+  message('Parent project compatibility mode: Inheriting optimization flags from parent project')
+elif get_option('parent_project_compat') and current_buildtype != 'debug'
+  # Standalone build with parent compatibility - use -O2 as fallback
   c_args += ['-O2']
-  message('Parent project compatibility mode: Using -O2 optimization')
+  message('Parent project compatibility mode (standalone): Using -O2 optimization')
 else
   # Use Meson's buildtype optimization settings
   message('Using buildtype optimization: @0@'.format(current_buildtype))
@@ -68,12 +77,12 @@ if meson.is_subproject()
   message('Subproject mode: Skipping HAL files, executables, and flash drivers - exposing libraries, dependencies, and tools')
 endif
 
-# wolfBoot debug configuration
+# wolfBoot debug configuration - only add debug defines if not already handled above
 if get_option('wolfboot_debug')
   c_args += ['-DDEBUG', '-DWOLFBOOT_DEBUG_ENABLED']
   # Also add as project-wide argument to ensure it gets applied
   add_project_arguments(['-DDEBUG', '-DWOLFBOOT_DEBUG_ENABLED'], language: 'c')
-  message('wolfBoot debug mode enabled')
+  message('wolfBoot debug defines enabled')
 endif
 
 # Small stack configuration
