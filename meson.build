@@ -93,38 +93,47 @@ endif
 # Critical system configuration flags
 if not get_option('vtor')
   c_args += ['-DNO_VTOR']
+  add_project_arguments(['-DNO_VTOR'], language: 'c')
 endif
 
 if get_option('no_mpu')
   c_args += ['-DWOLFBOOT_NO_MPU']
+  add_project_arguments(['-DWOLFBOOT_NO_MPU'], language: 'c')
 endif
 
 if get_option('ram_code')
   c_args += ['-DRAM_CODE']
+  add_project_arguments(['-DRAM_CODE'], language: 'c')
 endif
 
 if get_option('dualbank_swap')
   c_args += ['-DDUALBANK_SWAP=1']
+  add_project_arguments(['-DDUALBANK_SWAP=1'], language: 'c')
 endif
 
 if get_option('allow_downgrade')
   c_args += ['-DALLOW_DOWNGRADE']
+  add_project_arguments(['-DALLOW_DOWNGRADE'], language: 'c')
 endif
 
 if get_option('nvm_flash_writeonce')
   c_args += ['-DNVM_FLASH_WRITEONCE']
+  add_project_arguments(['-DNVM_FLASH_WRITEONCE'], language: 'c')
 endif
 
 if get_option('disable_backup')
   c_args += ['-DDISABLE_BACKUP']
+  add_project_arguments(['-DDISABLE_BACKUP'], language: 'c')
 endif
 
 if get_option('flags_home')
   c_args += ['-DFLAGS_HOME=1']
+  add_project_arguments(['-DFLAGS_HOME=1'], language: 'c')
 endif
 
 if get_option('flags_invert')
   c_args += ['-DWOLFBOOT_FLAGS_INVERT=1']
+  add_project_arguments(['-DWOLFBOOT_FLAGS_INVERT=1'], language: 'c')
 endif
 
 wolfboot_version = get_option('wolfboot_version')
